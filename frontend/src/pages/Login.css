@@ -1,0 +1,179 @@
+/* =========================
+   LOGIN PAGE
+========================= */
+
+main:has(form) {
+    min-height: calc(100vh - 72px);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    padding: 50px 20px;
+
+    background:
+        radial-gradient(
+            circle at 15% 20%,
+            rgba(99, 91, 255, 0.12),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at 85% 80%,
+            rgba(99, 91, 255, 0.10),
+            transparent 30%
+        ),
+        #f7f8fc;
+}
+
+/* Login title */
+
+main:has(form) h1 {
+    margin-bottom: 25px;
+
+    color: #171725;
+
+    font-size: 38px;
+    font-weight: 800;
+
+    letter-spacing: -1px;
+}
+
+/* Login card */
+
+main:has(form) form {
+    width: min(420px, 100%);
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 16px;
+
+    padding: 35px;
+
+    background: #ffffff;
+
+    border: 1px solid #e7e8ef;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 20px 50px rgba(30, 30, 70, 0.09);
+}
+
+/* Inputs */
+
+main:has(form) form input {
+    width: 100%;
+
+    padding: 15px 16px;
+
+    border: 1px solid #dedfe7;
+
+    border-radius: 10px;
+
+    outline: none;
+
+    background: #fafafe;
+
+    color: #171725;
+
+    font-size: 14px;
+
+    transition: all 0.2s ease;
+}
+
+main:has(form) form input::placeholder {
+    color: #9ca3af;
+}
+
+main:has(form) form input:hover {
+    border-color: #c9c9d8;
+}
+
+main:has(form) form input:focus {
+    border-color: #635bff;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 0 0 3px rgba(99, 91, 255, 0.12);
+}
+
+/* Login button */
+
+main:has(form) form button {
+    width: 100%;
+
+    margin-top: 5px;
+
+    padding: 14px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: #635bff;
+
+    color: white;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+}
+
+main:has(form) form button:hover {
+    background: #5048d8;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 8px 20px rgba(99, 91, 255, 0.25);
+}
+
+main:has(form) form button:active {
+    transform: translateY(0);
+}
+
+/* Error message */
+
+main:has(form) > p {
+    width: min(420px, 100%);
+
+    margin-bottom: 15px;
+
+    padding: 12px 15px;
+
+    border: 1px solid #fecaca;
+
+    border-radius: 10px;
+
+    background: #fef2f2;
+
+    color: #dc2626;
+
+    font-size: 13px;
+
+    text-align: center;
+}
+
+/* Mobile */
+
+@media (max-width: 500px) {
+
+    main:has(form) {
+        padding: 30px 16px;
+    }
+
+    main:has(form) h1 {
+        font-size: 32px;
+    }
+
+    main:has(form) form {
+        padding: 25px 20px;
+    }
+
+}
