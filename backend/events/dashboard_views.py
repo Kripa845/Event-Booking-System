@@ -56,6 +56,8 @@ class OrganizerEventsView(APIView):
                 "capacity": event.capacity,
                 "price": event.price,
                 "status": event.status,
+                "banner": event.banner.url if event.banner else None,
+                "image": event.image.url if event.image else None,
                 "tickets_sold": sold,
                 "available_seats": max(
                     event.capacity - sold,

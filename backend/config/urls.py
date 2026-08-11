@@ -19,19 +19,16 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import CustomTokenObtainPairView
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    path( "api/auth/",include("users.urls")
-    ),
+    path("api/auth/", include("users.urls")),
 
-    path("api/auth/login/",TokenObtainPairView.as_view(),name="token_obtain_pair",),
+    path("api/auth/login/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
 
     path( "api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh",),
 
@@ -40,8 +37,9 @@ urlpatterns = [
     path("api/",include("bookings.urls")),
     path("api/",include("tickets.urls")),
     path("api/",include("waitlist.urls")),
-    path("api/",include("events.dashboard_urls")
-),
+    path("api/",include("events.dashboard_urls")),
+    path("api/",include("users.admin_urls")),
+    path("api/",include("recommendations.urls")),
 ]
 urlpatterns += static(
     settings.MEDIA_URL,

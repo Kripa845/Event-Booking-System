@@ -25,11 +25,13 @@ class WaitlistSerializer(serializers.ModelSerializer):
             "event",
             "event_title",
             "position",
+            "status",
             "joined_at",
         ]
 
         read_only_fields = [
             "user",
             "position",
+            "status",
             "joined_at",
         ]

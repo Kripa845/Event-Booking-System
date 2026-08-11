@@ -48,11 +48,23 @@ class TicketSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    booking_id = serializers.IntegerField(
+        source="booking.id",
+        read_only=True,
+    )
+
+    booking_status = serializers.CharField(
+        source="booking.status",
+        read_only=True,
+    )
+
     class Meta:
         model = Ticket
 
         fields = [
             "id",
+            "booking_id",
+            "booking_status",
             "ticket_number",
             "username",
             "event_title",
