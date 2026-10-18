@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from waitlist.services import promote_next_user
 from events.models import Event
+from events.pricing import current_price
 
 from .models import Booking
 from .serializers import BookingSerializer
@@ -79,6 +80,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                     user=request.user,
                     event=event,
                     status=Booking.Status.CONFIRMED,
+                    price_paid=current_price(event, confirmed_bookings)["price"],
                 )
 
         except IntegrityError:

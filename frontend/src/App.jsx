@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import PrivateRoute from "./components/PrivateRoute";
 import AdminLayout from "./components/AdminLayout";
+import SkyBand from "./components/SkyBand";
+import SiteFooter from "./components/SiteFooter";
 
 // Public / Customer / Organizer pages
 import Home from "./pages/Home";
@@ -10,6 +12,7 @@ import EventDetails from "./pages/EventDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyTickets from "./pages/MyTickets";
+import MySky from "./pages/MySky";
 import Waitlist from "./pages/Waitlist";
 import CheckIn from "./pages/CheckIn";
 import OrganizerDashboard from "./pages/OrganizeDashboard";
@@ -33,10 +36,26 @@ function AdminRoute({ children }) {
     );
 }
 
+/** Night-sky band and cloud footer around public pages (admin uses its own sidebar shell). */
+function Chrome({ children }) {
+    const { pathname } = useLocation();
+    const isAdmin = pathname.startsWith("/admin");
+    const isAuth  = ["/login", "/register"].includes(pathname);
+    const ownSky  = pathname === "/" || isAuth;
+    return (
+        <>
+            <Navbar />
+            {!isAdmin && !ownSky && <SkyBand />}
+            {children}
+            {!isAdmin && !isAuth && <SiteFooter />}
+        </>
+    );
+}
+
 function App() {
     return (
         <BrowserRouter>
-            <Navbar />
+            <Chrome>
             <Routes>
                 {/* ── Public ── */}
                 <Route path="/"            element={<Home />} />
@@ -47,6 +66,9 @@ function App() {
                 {/* ── Customer ── */}
                 <Route path="/my-tickets" element={
                     <PrivateRoute><MyTickets /></PrivateRoute>
+                } />
+                <Route path="/my-sky" element={
+                    <PrivateRoute><MySky /></PrivateRoute>
                 } />
                 <Route path="/customer/dashboard" element={
                     <PrivateRoute><CustomerDashboard /></PrivateRoute>
@@ -77,6 +99,7 @@ function App() {
                 <Route path="/admin/profile"     element={<AdminRoute><AdminProfile /></AdminRoute>} />
                 <Route path="/admin/settings"    element={<AdminRoute><AdminSettings /></AdminRoute>} />
             </Routes>
+            </Chrome>
         </BrowserRouter>
     );
 }

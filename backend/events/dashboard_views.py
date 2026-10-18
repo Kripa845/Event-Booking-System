@@ -1,4 +1,5 @@
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Q, Sum
+from django.utils import timezone
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -9,6 +10,16 @@ from tickets.models import Ticket
 from waitlist.models import WaitlistEntry
 
 from .models import Event
+from .pricing import revenue as paid_revenue
+from .turnout import predict_turnout
+
+
+def _rating(event):
+    feedback = event.feedback.aggregate(avg=Avg("rating"), count=Count("id"))
+    return {
+        "avg_rating": round(feedback["avg"], 1) if feedback["avg"] else None,
+        "ratings": feedback["count"],
+    }
 
 
 class OrganizerEventsView(APIView):
@@ -65,6 +76,11 @@ class OrganizerEventsView(APIView):
                 ),
                 "checked_in": checked_in,
                 "waitlist": waitlist_count,
+                "revenue": paid_revenue(event.bookings.all()),
+                "category": event.category,
+                "is_outdoor": event.is_outdoor,
+                "start_time": event.start_time,
+                **_rating(event),
             })
 
         return Response(data)
@@ -113,7 +129,9 @@ class EventStatsView(APIView):
             event=event
         ).count()
 
-        revenue = confirmed * event.price
+        revenue = paid_revenue(event.bookings.all())
+
+        feedback = event.feedback.aggregate(avg=Avg("rating"), count=Count("id"))
 
         no_show = max(
             confirmed - checked_in,
@@ -133,6 +151,8 @@ class EventStatsView(APIView):
             "no_show": no_show,
             "waitlist": waitlist,
             "revenue": revenue,
+            "avg_rating": round(feedback["avg"], 1) if feedback["avg"] else None,
+            "ratings": feedback["count"],
         })
         
 class EventAttendeesView(APIView):
@@ -198,3 +218,79 @@ class EventAttendeesView(APIView):
             })
 
         return Response(data)
+
+class EventTurnoutView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+
+        event = Event.objects.filter(
+            id=event_id
+        ).first()
+
+        if not event:
+            return Response(
+                {"error": "Event not found."},
+                status=404,
+            )
+
+        if (
+            request.user.role != "ADMIN"
+            and event.organizer != request.user
+        ):
+            return Response(
+                {"error": "You do not own this event."},
+                status=403,
+            )
+
+        return Response(predict_turnout(event))
+
+
+class CheckInManifestView(APIView):
+    """Every ticket for one event, so the door can keep checking people in offline."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+
+        event = Event.objects.filter(
+            id=event_id
+        ).first()
+
+        if not event:
+            return Response(
+                {"error": "Event not found."},
+                status=404,
+            )
+
+        if (
+            request.user.role != "ADMIN"
+            and event.organizer != request.user
+        ):
+            return Response(
+                {"error": "You do not own this event."},
+                status=403,
+            )
+
+        tickets = Ticket.objects.filter(
+            booking__event=event
+        ).select_related("booking__user")
+
+        return Response({
+            "event": {
+                "id": event.id,
+                "title": event.title,
+                "date": event.date,
+            },
+            "generated_at": timezone.now(),
+            "tickets": [
+                {
+                    "ticket_number": t.ticket_number,
+                    "attendee": t.booking.user.username,
+                    "status": t.status,
+                    "checked_in_at": t.checked_in_at,
+                }
+                for t in tickets
+            ],
+        })

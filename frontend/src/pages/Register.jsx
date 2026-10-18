@@ -2,10 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import BackButton from "../components/BackButton";
+import AuthBrand from "../components/AuthBrand";
 
 const ROLES = [
     { value: "CUSTOMER",  icon: "👤", label: "Customer",  desc: "Browse & book events" },
     { value: "ORGANIZER", icon: "🎤", label: "Organizer", desc: "Create & manage events" },
+];
+
+const PERKS = [
+    { icon: "🔍", title: "Discover events", text: "Workshops, concerts, hackathons and more, all in one place." },
+    { icon: "🎟️", title: "Tickets in your pocket", text: "Every booking comes with a QR ticket for quick check-in." },
+    { icon: "🎤", title: "Host your own", text: "Organizers get a dashboard with attendees, check-ins and turnout forecasts." },
 ];
 
 export default function Register() {
@@ -13,8 +20,9 @@ export default function Register() {
     const [form, setForm] = useState({
         email: "", username: "", password: "", password2: "", role: "CUSTOMER",
     });
-    const [error,   setError]   = useState("");
-    const [loading, setLoading] = useState(false);
+    const [error,    setError]    = useState("");
+    const [loading,  setLoading]  = useState(false);
+    const [showPass, setShowPass] = useState(false);
 
     const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -36,79 +44,90 @@ export default function Register() {
     };
 
     return (
-        <div className="auth-page">
-            <BackButton label="← Back" style={{ textAlign: "center", marginBottom: "16px" }} />
-            <div className="auth-card">
-                <div className="auth-logo-wrap">
-                    <div className="auth-logo-icon">✨</div>
-                    <div>
-                        <h1 className="auth-title">Create account</h1>
-                        <p className="auth-subtitle">Join EventHub — it's free</p>
-                    </div>
-                </div>
+        <div className="auth-split">
+            <AuthBrand title="Join Nepal's home for great events." perks={PERKS} />
 
-                {error && <div className="alert alert-error">{error}</div>}
+            <section className="auth-form-side">
+                <div className="auth-form-wrap">
+                    <BackButton />
 
-                {/* Role picker — outside form so clicking doesn't submit */}
-                <div className="form-group">
-                    <label className="form-label">I am a</label>
-                    <div className="role-picker">
-                        {ROLES.map((r) => (
-                            <div
-                                key={r.value}
-                                className={`role-option${form.role === r.value ? " selected" : ""}`}
-                                onClick={() => setForm((f) => ({ ...f, role: r.value }))}
-                            >
-                                <div className="role-option-icon">{r.icon}</div>
-                                <div className="role-option-label">{r.label}</div>
-                                <div className="role-option-desc">{r.desc}</div>
+                    <h1 className="auth-title">Create account</h1>
+                    <p className="auth-subtitle">Join EventHub, it's free</p>
+
+                    {error && <div className="alert alert-error" style={{ marginTop: 20 }}>{error}</div>}
+
+                    <form onSubmit={onSubmit} className="auth-form">
+                        <div className="form-group">
+                            <span className="form-label">I am a</span>
+                            <div className="role-picker" role="radiogroup" aria-label="Account type">
+                                {ROLES.map((r) => (
+                                    <button
+                                        key={r.value}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={form.role === r.value}
+                                        className={`role-option${form.role === r.value ? " selected" : ""}`}
+                                        onClick={() => setForm((f) => ({ ...f, role: r.value }))}
+                                    >
+                                        <span className="role-option-icon">{r.icon}</span>
+                                        <span className="role-option-label">{r.label}</span>
+                                        <span className="role-option-desc">{r.desc}</span>
+                                    </button>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    {form.role === "ORGANIZER" && (
-                        <div className="pending-notice">
-                            ⏳ Organizer accounts need admin approval before you can log in.
+                            {form.role === "ORGANIZER" && (
+                                <div className="pending-notice">
+                                    ⏳ Organizer accounts need admin approval before you can log in.
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
 
-                <form onSubmit={onSubmit}>
-                    <div className="form-group">
-                        <label className="form-label">Email address</label>
-                        <input name="email" type="email" className="form-input"
-                            placeholder="you@example.com"
-                            value={form.email} onChange={onChange} required />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Username</label>
-                        <input name="username" className="form-input"
-                            placeholder="Choose a username"
-                            value={form.username} onChange={onChange} required />
-                    </div>
-                    <div className="form-grid-2">
                         <div className="form-group">
-                            <label className="form-label">Password</label>
-                            <input name="password" type="password" className="form-input"
-                                placeholder="Min. 8 characters"
-                                value={form.password} onChange={onChange} required />
+                            <label className="form-label" htmlFor="email">Email address</label>
+                            <input id="email" name="email" type="email" className="form-input"
+                                placeholder="you@example.com" autoComplete="email"
+                                value={form.email} onChange={onChange} required />
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Confirm password</label>
-                            <input name="password2" type="password" className="form-input"
-                                placeholder="Repeat password"
+                            <label className="form-label" htmlFor="username">Username</label>
+                            <input id="username" name="username" className="form-input"
+                                placeholder="Choose a username" autoComplete="username"
+                                value={form.username} onChange={onChange} required />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="password">Password</label>
+                            <div className="password-field">
+                                <input id="password" name="password"
+                                    type={showPass ? "text" : "password"} className="form-input"
+                                    placeholder="Min. 8 characters" autoComplete="new-password"
+                                    value={form.password} onChange={onChange} required />
+                                <button
+                                    type="button" className="password-toggle"
+                                    onClick={() => setShowPass((s) => !s)}
+                                    aria-label={showPass ? "Hide passwords" : "Show passwords"}
+                                >
+                                    {showPass ? "Hide" : "Show"}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="password2">Confirm password</label>
+                            <input id="password2" name="password2"
+                                type={showPass ? "text" : "password"} className="form-input"
+                                placeholder="Repeat password" autoComplete="new-password"
                                 value={form.password2} onChange={onChange} required />
                         </div>
-                    </div>
-                    <button type="submit" disabled={loading}
-                        className="btn btn-primary btn-full btn-lg" style={{ marginTop: 8 }}>
-                        {loading ? "Creating account…" : "Create Account"}
-                    </button>
-                </form>
+                        <button type="submit" disabled={loading}
+                            className="btn btn-primary btn-full btn-lg" style={{ marginTop: 8 }}>
+                            {loading ? "Creating account…" : "Create Account"}
+                        </button>
+                    </form>
 
-                <div className="auth-footer">
-                    Already have an account? <Link to="/login">Sign in</Link>
+                    <div className="auth-footer">
+                        Already have an account? <Link to="/login">Sign in</Link>
+                    </div>
                 </div>
-            </div>
+            </section>
         </div>
     );
 }

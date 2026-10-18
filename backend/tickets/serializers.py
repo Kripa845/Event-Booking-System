@@ -38,6 +38,21 @@ class TicketSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    event_id = serializers.IntegerField(
+        source="booking.event.id",
+        read_only=True,
+    )
+
+    is_outdoor = serializers.BooleanField(
+        source="booking.event.is_outdoor",
+        read_only=True,
+    )
+
+    event_start_time = serializers.TimeField(
+        source="booking.event.start_time",
+        read_only=True,
+    )
+
     event_date = serializers.DateField(
         source="booking.event.date",
         read_only=True,
@@ -58,6 +73,14 @@ class TicketSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    transferred_from = serializers.CharField(
+        source="booking.transferred_from.user.username",
+        read_only=True,
+        default=None,
+    )
+
+    transferred_to = serializers.SerializerMethodField()
+
     class Meta:
         model = Ticket
 
@@ -67,13 +90,22 @@ class TicketSerializer(serializers.ModelSerializer):
             "booking_status",
             "ticket_number",
             "username",
+            "event_id",
             "event_title",
             "event_date",
+            "event_start_time",
+            "is_outdoor",
             "location",
             "status",
             "qr_code",
             "checked_in_at",
             "created_at",
+            "transferred_from",
+            "transferred_to",
         ]
 
         read_only_fields = fields
+
+    def get_transferred_to(self, obj):
+        handed_on = obj.booking.transfers.select_related("user").first()
+        return handed_on.user.username if handed_on else None

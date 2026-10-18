@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import api, { getImageUrl } from "../services/api";
+import { fmtBs, fmtTime } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
+import WeatherCard from "../components/WeatherCard";
 
 function formatDate(d) {
     if (!d) return "";
@@ -62,6 +64,8 @@ function EventDetails() {
 
     const soldOut = event.available_seats === 0;
     const isFree = Number(event.price) === 0;
+    const earlyBird = event.pricing?.tier === "EARLY_BIRD";
+    const price = event.pricing?.price ?? event.price;
 
     return (
         <div className="container event-detail-page">
@@ -87,13 +91,22 @@ function EventDetails() {
                         </span>
                         <span className="badge badge-muted">{event.status}</span>
                         {isFree && <span className="badge badge-primary">Free</span>}
+                        {event.is_outdoor && <span className="badge badge-muted">🌳 Outdoor</span>}
                     </div>
 
                     <h1 className="event-detail-title">{event.title}</h1>
 
                     <div className="event-detail-info">
-                        <div className="event-detail-info-row">📅 {formatDate(event.date)}</div>
-                        <div className="event-detail-info-row">⏰ {event.start_time} – {event.end_time}</div>
+                        <div className="event-detail-info-row">
+                            📅 {formatDate(event.date)}
+                            <span className="event-detail-bs">{fmtBs(event.date, "np")}</span>
+                        </div>
+                        {event.holidays?.length > 0 && (
+                            <div className="event-detail-info-row event-holiday-note">
+                                🎉 Happens during {event.holidays.join(" & ")}, so expect festive crowds and busy roads.
+                            </div>
+                        )}
+                        <div className="event-detail-info-row">⏰ {fmtTime(event.start_time)} – {fmtTime(event.end_time)}</div>
                         <div className="event-detail-info-row">📍 {event.location}</div>
                         <div className="event-detail-info-row">👤 Organized by <strong style={{ marginLeft: 4 }}>{event.organizer_name}</strong></div>
                     </div>
@@ -107,9 +120,17 @@ function EventDetails() {
                 {/* Right column — booking card */}
                 <div>
                     <div className="booking-card">
+                        {earlyBird && (
+                            <div className="booking-early">
+                                Early-bird price, {event.pricing.discount}% off.
+                                Only {event.pricing.left_at_price} left before it goes up to
+                                NPR {Number(event.price).toLocaleString()}.
+                            </div>
+                        )}
                         <div className="booking-card-price">
-                            {isFree ? "Free" : `NPR ${Number(event.price).toLocaleString()}`}
+                            {isFree ? "Free" : `NPR ${Number(price).toLocaleString()}`}
                             {!isFree && <span> / ticket</span>}
+                            {earlyBird && <s className="booking-was">NPR {Number(event.price).toLocaleString()}</s>}
                         </div>
                         <div className="booking-card-seats">
                             {soldOut
@@ -131,7 +152,7 @@ function EventDetails() {
                                 </Link>
                             ) : (
                                 <button
-                                    className="btn btn-primary btn-full btn-lg"
+                                    className="btn btn-gold btn-full btn-lg"
                                     onClick={handleBooking}
                                     disabled={booking}
                                     style={{ marginBottom: "10px" }}
@@ -151,6 +172,7 @@ function EventDetails() {
                             Hosted by <strong>{event.organizer_name}</strong>
                         </p>
                     </div>
+                    {event.is_outdoor && <WeatherCard eventId={event.id} />}
                 </div>
             </div>
         </div>

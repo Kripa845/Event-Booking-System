@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import api from "../services/api";
+import { fmtBs } from "../utils/format";
 
 const CATEGORIES = [
     { value: "WORKSHOP",    label: "🛠️ Workshop" },
@@ -24,6 +25,9 @@ const INITIAL = {
     location: "",
     capacity: "",
     price: "0",
+    early_bird_discount: "0",
+    early_bird_seats: "0",
+    is_outdoor: false,
     status: "DRAFT",
 };
 
@@ -35,7 +39,26 @@ function CreateEvent() {
     const [error, setError] = useState("");
 
     const handleChange = (e) =>
-        setForm({ ...form, [e.target.name]: e.target.value });
+        setForm({
+            ...form,
+            [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value,
+        });
+
+    const earlyPrice = Math.round(Number(form.price || 0) * (100 - Number(form.early_bird_discount || 0)) / 100);
+
+    // Warn about public holidays and similar events on the chosen date.
+    const [dateCheck, setDateCheck] = useState(null);
+    useEffect(() => {
+        if (!form.date) { setDateCheck(null); return; }
+        const timer = setTimeout(() => {
+            api.get("events/date-check/", {
+                params: { date: form.date, location: form.location, category: form.category },
+            })
+                .then((res) => setDateCheck(res.data))
+                .catch(() => setDateCheck(null));
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [form.date, form.location, form.category]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -125,6 +148,7 @@ function CreateEvent() {
                                 onChange={handleChange}
                                 required
                             />
+                            {form.date && <span className="form-hint">{fmtBs(form.date, "np")} · {fmtBs(form.date)}</span>}
                         </div>
                         <div className="form-group">
                             <label className="form-label">Location *</label>
@@ -185,6 +209,71 @@ function CreateEvent() {
                             />
                         </div>
                     </div>
+
+                    {Number(form.price) > 0 && (
+                        <fieldset className="form-fieldset">
+                            <legend>Early-bird pricing (optional)</legend>
+                            <div className="form-grid-2">
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="early_bird_discount">Discount (%)</label>
+                                    <input
+                                        id="early_bird_discount" name="early_bird_discount" type="number"
+                                        min="0" max="90" className="form-input"
+                                        value={form.early_bird_discount} onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="early_bird_seats">For the first … tickets</label>
+                                    <input
+                                        id="early_bird_seats" name="early_bird_seats" type="number"
+                                        min="0" max={form.capacity || undefined} className="form-input"
+                                        value={form.early_bird_seats} onChange={handleChange}
+                                    />
+                                </div>
+                            </div>
+                            {Number(form.early_bird_discount) > 0 && Number(form.early_bird_seats) > 0 && (
+                                <p className="form-hint">
+                                    The first {form.early_bird_seats} tickets sell at NPR {earlyPrice.toLocaleString()},
+                                    then the price goes up to NPR {Number(form.price).toLocaleString()}.
+                                </p>
+                            )}
+                        </fieldset>
+                    )}
+
+                    <label className="form-check">
+                        <input type="checkbox" name="is_outdoor" checked={form.is_outdoor} onChange={handleChange} />
+                        <span>
+                            <strong>This is an outdoor event</strong>
+                            <span className="form-hint">Attendees get a weather forecast and rain alerts.</span>
+                        </span>
+                    </label>
+
+                    {dateCheck && (dateCheck.holidays.length > 0 || dateCheck.clashes.length > 0) && (
+                        <div className="date-warnings" role="status">
+                            {dateCheck.holidays.map((h) => (
+                                <div key={h.name} className={`alert ${h.major ? "alert-warning" : "alert-info"}`}>
+                                    <strong>{h.name}{h.name_np && ` (${h.name_np})`}</strong>{" "}
+                                    {h.start_date === h.end_date ? "is a public holiday that day." : `runs ${h.start_date} to ${h.end_date}.`}{" "}
+                                    {h.major
+                                        ? "Many people travel home for this festival, so turnout may be lower."
+                                        : "Some people will be off work, which can help or hurt turnout."}
+                                </div>
+                            ))}
+                            {dateCheck.clashes.length > 0 && (
+                                <div className="alert alert-warning">
+                                    <strong>Similar events on the same day:</strong>
+                                    <ul className="date-clash-list">
+                                        {dateCheck.clashes.map((c) => (
+                                            <li key={c.id}>
+                                                <Link to={`/events/${c.id}`} target="_blank">{c.title}</Link>{" "}
+                                                by {c.organizer}, {c.location} ({c.reasons.join(", ")})
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="form-group">
                         <label className="form-label">Event Image (optional)</label>

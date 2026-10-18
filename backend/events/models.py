@@ -57,6 +57,18 @@ class Event(models.Model):
     capacity = models.PositiveIntegerField()
     price    = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    # Early-bird pricing: the first `early_bird_seats` tickets sell at a discount,
+    # then the price steps up to the regular `price`.
+    early_bird_discount = models.PositiveSmallIntegerField(
+        default=0, help_text="Percent off for early-bird tickets (0 = no early bird).",
+    )
+    early_bird_seats = models.PositiveIntegerField(
+        default=0, help_text="How many tickets sell at the early-bird price.",
+    )
+
+    # Outdoor events get weather forecasts and rain alerts.
+    is_outdoor = models.BooleanField(default=False)
+
     # ── Status & Media ────────────────────────────────
     status = models.CharField(
         max_length=20,
@@ -75,3 +87,25 @@ class Event(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Holiday(models.Model):
+    """
+    Public holidays / big festivals. Festival dates follow the lunar calendar
+    and move every year, so admins keep this list current from the gazette.
+    """
+
+    name       = models.CharField(max_length=120)
+    name_np    = models.CharField(max_length=120, blank=True)
+    start_date = models.DateField()
+    end_date   = models.DateField(help_text="Same as start date for one-day holidays.")
+    major      = models.BooleanField(
+        default=False,
+        help_text="Big festivals (e.g. Dashain, Tihar) when many people travel home.",
+    )
+
+    class Meta:
+        ordering = ["start_date"]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_date})"

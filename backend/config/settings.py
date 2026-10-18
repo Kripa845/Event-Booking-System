@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'tickets.apps.TicketsConfig',
     'waitlist',
     'recommendations',
+    'feedback',
 ]
 
 MIDDLEWARE = [
@@ -79,6 +80,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # Smart search calls the Claude API, so cap how often one user/IP can use it.
+    "DEFAULT_THROTTLE_RATES": {"smart_search": "30/hour"},
 }
 
 # ── SimpleJWT ─────────────────────────────────────────

@@ -64,12 +64,12 @@ class WaitlistViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            already_waiting = WaitlistEntry.objects.filter(
+            existing = WaitlistEntry.objects.filter(
                 user=request.user,
                 event=event
-            ).exists()
+            ).first()
 
-            if already_waiting:
+            if existing and existing.status == WaitlistEntry.Status.WAITING:
 
                 return Response(
                     {
@@ -85,11 +85,18 @@ class WaitlistViewSet(viewsets.ModelViewSet):
                 + 1
             )
 
-            entry = WaitlistEntry.objects.create(
-                user=request.user,
-                event=event,
-                position=position,
-            )
+            if existing:
+                # Previously promoted or cancelled: rejoin at the back.
+                existing.status = WaitlistEntry.Status.WAITING
+                existing.position = position
+                existing.save(update_fields=["status", "position"])
+                entry = existing
+            else:
+                entry = WaitlistEntry.objects.create(
+                    user=request.user,
+                    event=event,
+                    position=position,
+                )
 
         serializer = self.get_serializer(entry)
 

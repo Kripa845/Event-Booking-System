@@ -2,12 +2,13 @@ from django.db import transaction
 
 from .models import WaitlistEntry
 from bookings.models import Booking
+from events.pricing import current_price
 
 
 @transaction.atomic
 def promote_next_user(event):
 
-    waitlist_entry = (
+    waiting = (
         WaitlistEntry.objects
         .select_for_update()
         .filter(
@@ -15,21 +16,35 @@ def promote_next_user(event):
             status=WaitlistEntry.Status.WAITING,
         )
         .order_by("position", "joined_at")
-        .first()
     )
 
-    if not waitlist_entry:
-        return None
+    for waitlist_entry in waiting:
 
-    booking = Booking.objects.create(
-        user=waitlist_entry.user,
-        event=event,
-        status=Booking.Status.CONFIRMED,
-    )
+        # The user may have grabbed a seat directly since joining the
+        # waitlist; skip them rather than creating a duplicate booking.
+        already_booked = Booking.objects.filter(
+            user=waitlist_entry.user,
+            event=event,
+            status=Booking.Status.CONFIRMED,
+        ).exists()
 
-    waitlist_entry.status = WaitlistEntry.Status.PROMOTED
-    waitlist_entry.save(
-        update_fields=["status"]
-    )
+        if already_booked:
+            waitlist_entry.status = WaitlistEntry.Status.CANCELLED
+            waitlist_entry.save(update_fields=["status"])
+            continue
 
-    return booking
+        booking = Booking.objects.create(
+            user=waitlist_entry.user,
+            event=event,
+            status=Booking.Status.CONFIRMED,
+            price_paid=current_price(event)["price"],
+        )
+
+        waitlist_entry.status = WaitlistEntry.Status.PROMOTED
+        waitlist_entry.save(
+            update_fields=["status"]
+        )
+
+        return booking
+
+    return None

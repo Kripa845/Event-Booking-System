@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import TicketIcon from "./TicketIcon";
 
 function Navbar() {
     const { isAuthenticated, isOrganizer, isAdmin, isCustomer, user, logout } = useAuth();
@@ -9,15 +10,14 @@ function Navbar() {
     // Admin — minimal bar (they use the sidebar)
     if (isAdmin) {
         return (
-            <nav className="navbar">
+            <nav className="navbar navbar-night">
                 <Link to="/admin/dashboard" className="navbar-logo">
-                    <div className="navbar-logo-icon">🎟️</div>
+                    <div className="navbar-logo-icon"><TicketIcon /></div>
                     <span>EventHub</span>
                     <span className="nav-role-badge">Admin</span>
                 </Link>
                 <div className="navbar-links">
                     <span className="nav-user">
-                        <span className="nav-user-dot" />
                         {user?.username}
                     </span>
                     <button className="btn btn-outline btn-sm" onClick={logout}>Sign out</button>
@@ -27,19 +27,20 @@ function Navbar() {
     }
 
     return (
-        <nav className="navbar">
+        <nav className="navbar navbar-night">
             <Link to="/" className="navbar-logo">
-                <div className="navbar-logo-icon">🎟️</div>
+                <div className="navbar-logo-icon"><TicketIcon /></div>
                 <span>EventHub</span>
             </Link>
 
             <div className="navbar-links">
-                <Link to="/" className={a("/")}>Events</Link>
+                <Link to="/" className={`${a("/")} nav-hide-mobile`}>Events</Link>
 
                 {isAuthenticated && isCustomer && (
                     <>
                         <Link to="/customer/dashboard" className={a("/customer/dashboard")}>Dashboard</Link>
                         <Link to="/my-tickets" className={a("/my-tickets")}>My Tickets</Link>
+                        <Link to="/my-sky" className={a("/my-sky")}>My Sky</Link>
                     </>
                 )}
 
@@ -56,7 +57,6 @@ function Navbar() {
                 {isAuthenticated ? (
                     <>
                         <span className="nav-user">
-                            <span className="nav-user-dot" />
                             {user?.username}
                         </span>
                         <button className="btn btn-outline btn-sm" onClick={logout}>Sign out</button>

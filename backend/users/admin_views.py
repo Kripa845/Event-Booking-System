@@ -6,6 +6,7 @@ from rest_framework import status
 from users.models import User
 from events.models import Event
 from bookings.models import Booking
+from events.pricing import revenue as paid_revenue
 from tickets.models import Ticket
 from waitlist.models import WaitlistEntry
 
@@ -32,12 +33,7 @@ class AdminDashboardStatsView(APIView):
         confirmed = Booking.objects.filter(status=Booking.Status.CONFIRMED).count()
         used      = Ticket.objects.filter(status=Ticket.Status.USED).count()
 
-        total_revenue = sum(
-            b.event.price
-            for b in Booking.objects.filter(
-                status=Booking.Status.CONFIRMED
-            ).select_related("event")
-        )
+        total_revenue = paid_revenue(Booking.objects.all())
 
         return Response({
             "users": {
@@ -223,7 +219,7 @@ class AdminEventsView(APIView):
                 "available_seats":max(e.capacity - sold, 0),
                 "checked_in":     checked_in,
                 "waitlist":       waitlist,
-                "revenue":        float(sold * e.price),
+                "revenue":        float(paid_revenue(e.bookings.all())),
                 "created_at":     e.created_at,
                 "updated_at":     e.updated_at,
             })
@@ -237,12 +233,7 @@ class AdminEventsView(APIView):
 
 def _organizer_dict(u):
     events_count  = Event.objects.filter(organizer=u).count()
-    revenue       = sum(
-        b.event.price
-        for b in Booking.objects.filter(
-            event__organizer=u, status=Booking.Status.CONFIRMED
-        ).select_related("event")
-    )
+    revenue       = paid_revenue(Booking.objects.filter(event__organizer=u))
     return {
         "id":           u.id,
         "username":     u.username,

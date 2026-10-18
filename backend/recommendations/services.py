@@ -1,4 +1,6 @@
 import logging
+
+import numpy as np
 from django.utils import timezone
 from django.db.models import Count, Q
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -6,6 +8,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from events.models import Event
 from bookings.models import Booking
+from feedback.models import EventFeedback
+
+# How much a rated event counts when matching (from memory-postcard ratings).
+# Events rated 1–2 are left out of the user's taste profile entirely.
+RATING_WEIGHT = {5: 1.25, 4: 1.1, 3: 1.0}
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +78,21 @@ def get_recommendations(user, limit=5):
     if not candidates.exists():
         return []
         
-    # Edge Case 2: New user (no bookings) -> Fallback to popular upcoming events
-    if not booked_events:
+    # Disliked events (rated 1–2) shouldn't shape what we suggest next.
+    ratings = dict(
+        EventFeedback.objects.filter(user=user).values_list("event_id", "rating")
+    )
+    profile_events = [e for e in booked_events if ratings.get(e.id, 3) >= 3]
+    weights = np.array([RATING_WEIGHT.get(ratings.get(e.id), 1.0) for e in profile_events])
+
+    # Edge Case 2: New user (no bookings, or only disliked ones) -> popular upcoming events
+    if not profile_events:
         popular_events = get_popular_upcoming_events(exclude_ids=booked_event_ids, limit=limit)
         return [(event, 0.0) for event in popular_events]
         
     try:
         # 3. Clean and prepare texts for vectorization
-        booked_texts = [clean_and_combine(e) for e in booked_events]
+        booked_texts = [clean_and_combine(e) for e in profile_events]
         candidate_list = list(candidates)
         candidate_texts = [clean_and_combine(e) for e in candidate_list]
         
@@ -91,12 +105,14 @@ def get_recommendations(user, limit=5):
         tfidf_matrix = vectorizer.fit_transform(corpus)
         
         # 5. Extract vector slices
-        booked_vectors = tfidf_matrix[:len(booked_events)]
-        candidate_vectors = tfidf_matrix[len(booked_events):]
+        booked_vectors = tfidf_matrix[:len(profile_events)]
+        candidate_vectors = tfidf_matrix[len(profile_events):]
         
         # 6. Compute Cosine Similarity between user's booked events and upcoming candidates
         # Result shape: (num_booked_events, num_candidate_events)
         similarity_matrix = cosine_similarity(booked_vectors, candidate_vectors)
+        # Events the user loved pull harder.
+        similarity_matrix = similarity_matrix * weights[:, None]
         
         # 7. Aggregate similarity scores by taking the maximum similarity to any booked event
         # (Ideal for users with diverse interests)

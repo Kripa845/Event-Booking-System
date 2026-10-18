@@ -56,7 +56,7 @@ function Waitlist() {
 
                 {!joined ? (
                     <button
-                        className="btn btn-primary btn-lg btn-full"
+                        className="btn btn-gold btn-lg btn-full"
                         onClick={joinWaitlist}
                         disabled={loading}
                     >
