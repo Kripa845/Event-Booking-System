@@ -52,9 +52,16 @@ export default function Login() {
                     <p className="auth-subtitle">Sign in to your EventHub account</p>
 
                     {location.state?.registered && !error && (
-                        <div className="alert alert-success" style={{ marginTop: 20 }}>
-                            Account created. Sign in to get started.
-                        </div>
+                        location.state.role === "ORGANIZER" ? (
+                            <div className="alert alert-info" style={{ marginTop: 20 }}>
+                                Organizer account created. An admin needs to approve it before you can
+                                sign in. Try again once you've been approved.
+                            </div>
+                        ) : (
+                            <div className="alert alert-success" style={{ marginTop: 20 }}>
+                                Account created. Sign in to get started.
+                            </div>
+                        )
                     )}
                     {error && <div className="alert alert-error" style={{ marginTop: 20 }}>{error}</div>}
 

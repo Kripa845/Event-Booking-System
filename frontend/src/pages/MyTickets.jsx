@@ -157,6 +157,9 @@ function MyTickets() {
                                         alt="QR Code"
                                     />
                                     <div className="ticket-qr-number">{ticket.ticket_number}</div>
+                                    <Link to={`/my-tickets/${ticket.id}`} className="btn btn-primary btn-sm">
+                                        🎟️ View &amp; save ticket
+                                    </Link>
                                 </div>
                             )}
 

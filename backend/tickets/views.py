@@ -63,15 +63,31 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Optional so older clients keep working; when sent, tickets for other events are refused.
+        event_id = request.data.get("event_id")
+        if event_id in ("", None):
+            event_id = None
+        elif not str(event_id).isdigit():
+            return Response(
+                {"error": "event_id must be a number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
-            result, ticket = checkin.check_in_ticket(ticket_number.strip(), request.user)
+            result, ticket = checkin.check_in_ticket(
+                ticket_number.strip(), request.user, event_id=event_id,
+            )
 
         if result != checkin.CHECKED_IN:
             code = {
                 checkin.INVALID: status.HTTP_404_NOT_FOUND,
                 checkin.NOT_YOURS: status.HTTP_403_FORBIDDEN,
             }.get(result, status.HTTP_400_BAD_REQUEST)
-            return Response({"error": checkin.MESSAGES[result], "code": result}, status=code)
+            body = {"error": checkin.MESSAGES[result], "code": result}
+            if ticket:
+                body["attendee"] = ticket.booking.user.username
+                body["checked_in_at"] = ticket.checked_in_at
+            return Response(body, status=code)
 
         return Response(
             {

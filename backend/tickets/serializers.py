@@ -63,6 +63,23 @@ class TicketSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    venue = serializers.CharField(
+        source="booking.event.venue",
+        read_only=True,
+    )
+
+    event_end_time = serializers.TimeField(
+        source="booking.event.end_time",
+        read_only=True,
+    )
+
+    price_paid = serializers.DecimalField(
+        source="booking.price_paid",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+    )
+
     booking_id = serializers.IntegerField(
         source="booking.id",
         read_only=True,
@@ -96,6 +113,9 @@ class TicketSerializer(serializers.ModelSerializer):
             "event_start_time",
             "is_outdoor",
             "location",
+            "venue",
+            "event_end_time",
+            "price_paid",
             "status",
             "qr_code",
             "checked_in_at",

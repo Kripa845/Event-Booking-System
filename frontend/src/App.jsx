@@ -12,6 +12,7 @@ import EventDetails from "./pages/EventDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyTickets from "./pages/MyTickets";
+import TicketView from "./pages/TicketView";
 import MySky from "./pages/MySky";
 import Waitlist from "./pages/Waitlist";
 import CheckIn from "./pages/CheckIn";
@@ -66,6 +67,9 @@ function App() {
                 {/* ── Customer ── */}
                 <Route path="/my-tickets" element={
                     <PrivateRoute><MyTickets /></PrivateRoute>
+                } />
+                <Route path="/my-tickets/:id" element={
+                    <PrivateRoute><TicketView /></PrivateRoute>
                 } />
                 <Route path="/my-sky" element={
                     <PrivateRoute><MySky /></PrivateRoute>

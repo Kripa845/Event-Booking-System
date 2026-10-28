@@ -1,0 +1,99 @@
+/* =====================================================
+   SINGLE TICKET (view + save as image / PDF)
+   Fixed colors so the saved file looks the same everywhere.
+===================================================== */
+.tv {
+  --tv-night:   #0d1233;
+  --tv-night-2: #1b2150;
+  --tv-night-3: #2c3474;
+  --tv-gold:    #f9c74f;
+  --tv-ink:     #141a3d;
+  --tv-mist:    #c9cdea;
+  --tv-paper:   #fbf8f0;
+  max-width: 880px;
+}
+
+/* Everything inside .tv-sheet is what gets saved. */
+.tv-sheet { padding: 24px; background: var(--bg); border-radius: var(--r-lg); }
+
+.tv-ticket {
+  position: relative; display: flex; overflow: hidden;
+  border-radius: 20px; box-shadow: 0 18px 50px rgba(13,18,51,.25);
+}
+
+/* Left: event details on a night-sky background */
+.tv-main {
+  flex: 1; min-width: 0; padding: 30px 32px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(249,199,79,.18), transparent 40%),
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,.7), transparent),
+    radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,.6), transparent),
+    radial-gradient(1px 1px at 75% 40%, rgba(255,255,255,.5), transparent),
+    radial-gradient(1.5px 1.5px at 40% 85%, rgba(255,255,255,.5), transparent),
+    linear-gradient(135deg, var(--tv-night) 0%, var(--tv-night-2) 60%, var(--tv-night-3) 100%);
+}
+.tv-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: .5px; color: var(--tv-gold);
+}
+.tv-admit {
+  margin-left: auto; padding: 3px 10px; border: 1px solid rgba(249,199,79,.5); border-radius: 999px;
+  font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase;
+}
+.tv-title {
+  margin: 18px 0 24px;
+  font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 4vw, 36px); line-height: 1.12;
+  text-wrap: balance;
+}
+.tv-details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; margin: 0; }
+.tv-details .tv-wide { grid-column: 1 / -1; }
+.tv-details dt {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: var(--tv-mist);
+}
+.tv-details dd { margin: 4px 0 0; font-size: 15px; font-weight: 600; }
+.tv-sub { display: block; font-size: 12px; font-weight: 400; color: var(--tv-mist); margin-top: 2px; }
+
+/* Right: tear-off stub with the QR code */
+.tv-stub {
+  position: relative; width: 250px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 28px 22px; background: var(--tv-paper); color: var(--tv-ink);
+  border-left: 2px dashed #d6d3c6;
+}
+/* Half-circle notches where the stub tears off */
+.tv-stub::before, .tv-stub::after {
+  content: ""; position: absolute; left: -15px; width: 28px; height: 28px;
+  border-radius: 50%; background: var(--bg);
+}
+.tv-stub::before { top: -14px; }
+.tv-stub::after  { bottom: -14px; }
+.tv-qr { padding: 10px; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(13,18,51,.1); }
+.tv-qr img { display: block; width: 170px; height: 170px; }
+.tv-number { font-family: monospace; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; }
+.tv-hint { font-size: 11.5px; color: #6b6f8c; text-align: center; }
+.tv-void { font-weight: 600; color: #6b6f8c; text-align: center; }
+
+/* USED / CANCELLED rubber stamp */
+.tv-stamp {
+  position: absolute; top: 50%; left: 38%; transform: translate(-50%, -50%) rotate(-14deg);
+  padding: 6px 18px; border: 4px solid currentColor; border-radius: 10px;
+  font-size: 34px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase;
+  color: rgba(249,199,79,.85); pointer-events: none;
+}
+.tv-ticket.is-cancelled .tv-stamp { color: rgba(239,68,68,.85); }
+.tv-ticket.is-cancelled .tv-main { filter: grayscale(.6); }
+
+.tv-actions { display: flex; gap: 12px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+
+/* Phones: stack the stub under the details */
+@media (max-width: 640px) {
+  .tv-sheet { padding: 12px; }
+  .tv-ticket { flex-direction: column; }
+  .tv-main { padding: 24px 22px; }
+  .tv-stub { width: auto; border-left: none; border-top: 2px dashed #d6d3c6; }
+  .tv-stub::before, .tv-stub::after { top: -15px; bottom: auto; left: auto; }
+  .tv-stub::before { left: -14px; }
+  .tv-stub::after  { right: -14px; }
+  .tv-stamp { left: 50%; top: 30%; font-size: 26px; }
+}

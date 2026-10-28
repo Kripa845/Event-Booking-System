@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BASE_URL = "http://127.0.0.1:8000";
+// Where the Django backend runs. Override with VITE_API_URL in frontend/.env.local,
+// e.g. VITE_API_URL=http://127.0.0.1:8001 when port 8000 is taken by another app.
+const BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 export function getImageUrl(path) {
     if (!path) return null;

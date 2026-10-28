@@ -3,6 +3,7 @@ from io import BytesIO
 
 import qrcode
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db import models
 
@@ -84,3 +85,48 @@ class Ticket(models.Model):
 
     def __str__(self):
         return self.ticket_number
+
+
+class Attendance(models.Model):
+    """
+    One row per person who actually came in: who it was, which event, and when
+    their QR code was scanned. Kept separate from Ticket so the entry log stays
+    readable on its own (and keeps the name even if the user renames later).
+    """
+
+    ticket = models.OneToOneField(
+        Ticket,
+        on_delete=models.CASCADE,
+        related_name="attendance",
+    )
+
+    event = models.ForeignKey(
+        "events.Event",
+        on_delete=models.CASCADE,
+        related_name="attendance",
+    )
+
+    attendee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="attendance",
+    )
+
+    attendee_name = models.CharField(max_length=150)
+
+    # When the QR was scanned. Offline scans keep their real scan time.
+    entered_at = models.DateTimeField()
+
+    scanned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["entered_at"]
+
+    def __str__(self):
+        return f"{self.attendee_name} entered {self.event} at {self.entered_at:%Y-%m-%d %H:%M}"

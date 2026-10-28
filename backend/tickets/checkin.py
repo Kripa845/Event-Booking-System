@@ -6,6 +6,7 @@ from django.utils import timezone
 from bookings.models import Booking
 
 from .models import Ticket
+from .attendance import record_entry
 
 CHECKED_IN = "checked_in"
 INVALID = "invalid"
@@ -73,5 +74,6 @@ def check_in_ticket(ticket_number, user, scanned_at=None, event_id=None):
     ticket.status = Ticket.Status.USED
     ticket.checked_in_at = min(scanned_at, now) if scanned_at else now
     ticket.save(update_fields=["status", "checked_in_at"])
+    record_entry(ticket, ticket.checked_in_at, user)
 
     return CHECKED_IN, ticket

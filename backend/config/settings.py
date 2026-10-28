@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'waitlist',
     'recommendations',
     'feedback',
+    'notifications',
 ]
 
 MIDDLEWARE = [

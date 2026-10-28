@@ -31,7 +31,7 @@ export default function Register() {
         setError(""); setLoading(true);
         try {
             await api.post("auth/register/", form);
-            navigate("/login", { state: { registered: true } });
+            navigate("/login", { state: { registered: true, role: form.role } });
         } catch (err) {
             const d = err.response?.data;
             if (d) {

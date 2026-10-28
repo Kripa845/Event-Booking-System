@@ -14,7 +14,7 @@ function formatDate(d) {
 function EventDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isOrganizer } = useAuth();
 
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -141,7 +141,11 @@ function EventDetails() {
                         {success && <div className="alert alert-success">{success}</div>}
                         {error   && <div className="alert alert-error">{error}</div>}
 
-                        {!success && (
+                        {isOrganizer && (
+                            <div className="alert alert-info">Organizer accounts can't book tickets.</div>
+                        )}
+
+                        {!success && !isOrganizer && (
                             soldOut ? (
                                 <Link
                                     to={`/events/${event.id}/waitlist`}

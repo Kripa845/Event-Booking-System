@@ -2,6 +2,7 @@ from django.urls import path
 
 from .dashboard_views import (
     CheckInManifestView,
+    EventAttendanceView,
     EventAttendeesView,
     EventStatsView,
     EventTurnoutView,
@@ -23,6 +24,11 @@ urlpatterns = [
     path(
         "organizer/events/<int:event_id>/attendees/",
         EventAttendeesView.as_view(),
+    ),
+
+    path(
+        "organizer/events/<int:event_id>/attendance/",
+        EventAttendanceView.as_view(),
     ),
 
     path(

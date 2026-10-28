@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getImageUrl } from "../services/api";
 import WeatherCard from "../components/WeatherCard";
+import EventBrowser from "../components/EventBrowser";
 import { useAuth } from "../context/AuthContext";
 import { fmtBs, fmtDay, fmtTime, fromNow, greeting, todayIso } from "../utils/format";
 import "./Dashboard.css";
@@ -133,6 +134,7 @@ function OrganizerDashboard() {
     const shown = groups[tab];
 
     return (
+        <>
         <div className="container page dash">
             <header className="dash-hero">
                 <div>
@@ -328,6 +330,10 @@ function OrganizerDashboard() {
                 )}
             </section>
         </div>
+
+        {/* Same events section as the landing page (organizers can browse, not book). */}
+        <EventBrowser />
+        </>
     );
 }
 

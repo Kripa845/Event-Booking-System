@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from bookings.models import Booking
-from tickets.models import Ticket
+from tickets.models import Attendance, Ticket
 from waitlist.models import WaitlistEntry
 
 from .models import Event
@@ -218,6 +218,33 @@ class EventAttendeesView(APIView):
             })
 
         return Response(data)
+
+class EventAttendanceView(APIView):
+    """Entry log: who came in and when their QR was scanned, in order of arrival."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+
+        event = Event.objects.filter(id=event_id).first()
+
+        if not event:
+            return Response({"error": "Event not found."}, status=404)
+
+        if request.user.role != "ADMIN" and event.organizer != request.user:
+            return Response({"error": "You do not own this event."}, status=403)
+
+        entries = Attendance.objects.filter(event=event).select_related("ticket", "scanned_by")
+
+        return Response([
+            {
+                "attendee_name": e.attendee_name,
+                "ticket_number": e.ticket.ticket_number,
+                "entered_at": e.entered_at,
+                "scanned_by": e.scanned_by.username if e.scanned_by else None,
+            }
+            for e in entries
+        ])
 
 class EventTurnoutView(APIView):
 

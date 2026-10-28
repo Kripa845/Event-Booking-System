@@ -8,7 +8,9 @@ from bookings.models import Booking
 from events.models import Event
 from users.models import User
 
-from .models import Ticket
+from notifications.models import Notification
+
+from .models import Attendance, Ticket
 from .sky import CONSTELLATION_MIN
 
 
@@ -121,6 +123,51 @@ class CheckInTests(TestCase):
         self.ticket.refresh_from_db()
         self.assertEqual(self.ticket.status, Ticket.Status.VALID)
 
+    def test_live_check_in_for_selected_event(self):
+        res = self.client.post("/api/tickets/check-in/", {
+            "ticket_number": self.ticket.ticket_number, "event_id": self.event.id,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["attendee"], self.guest.username)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, Ticket.Status.USED)
+
+        # The repeat scan says when the ticket was first used.
+        res = self.client.post("/api/tickets/check-in/", {
+            "ticket_number": self.ticket.ticket_number, "event_id": self.event.id,
+        })
+        self.assertEqual(res.data["code"], "already_used")
+        self.assertIsNotNone(res.data["checked_in_at"])
+
+    def test_live_check_in_rejects_ticket_for_other_event(self):
+        # Same organizer, but the scanner has a different event selected.
+        other_event = make_event(self.organizer, days=1, title="Other")
+        res = self.client.post("/api/tickets/check-in/", {
+            "ticket_number": self.ticket.ticket_number, "event_id": other_event.id,
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data["code"], "wrong_event")
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, Ticket.Status.VALID)
+
+    def test_live_check_in_rejects_bad_event_id(self):
+        res = self.client.post("/api/tickets/check-in/", {
+            "ticket_number": self.ticket.ticket_number, "event_id": "abc",
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("error", res.data)
+
+    def test_check_in_requires_organizer(self):
+        attendee = APIClient()
+        attendee.force_authenticate(self.guest)
+        res = attendee.post("/api/tickets/check-in/", {"ticket_number": self.ticket.ticket_number})
+        self.assertEqual(res.status_code, 403)
+
+        res = APIClient().post("/api/tickets/check-in/", {"ticket_number": self.ticket.ticket_number})
+        self.assertEqual(res.status_code, 401)
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, Ticket.Status.VALID)
+
     def test_manifest_lists_event_tickets(self):
         res = self.client.get(f"/api/organizer/events/{self.event.id}/checkin-manifest/")
         self.assertEqual(res.status_code, 200)
@@ -141,6 +188,51 @@ class CheckInTests(TestCase):
         )
         self.assertEqual(res.status_code, 200)
         return {r["ticket_number"]: r["result"] for r in res.data["results"]}
+
+    def test_check_in_records_entry_and_welcomes_attendee(self):
+        res = self.client.post("/api/tickets/check-in/", {
+            "ticket_number": self.ticket.ticket_number, "event_id": self.event.id,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.ticket.refresh_from_db()
+
+        entry = Attendance.objects.get(ticket=self.ticket)
+        self.assertEqual(entry.attendee_name, self.guest.username)
+        self.assertEqual(entry.entered_at, self.ticket.checked_in_at)
+        self.assertEqual(entry.scanned_by, self.organizer)
+
+        # The attendee gets a welcome notification...
+        guest = APIClient()
+        guest.force_authenticate(self.guest)
+        res = guest.get("/api/notifications/")
+        self.assertEqual(res.data["unread"], 1)
+        self.assertIn(self.event.title, res.data["results"][0]["message"])
+
+        # ...and the organizer sees them in the entry log.
+        res = self.client.get(f"/api/organizer/events/{self.event.id}/attendance/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data[0]["attendee_name"], self.guest.username)
+
+        # A repeat scan is refused and adds nothing.
+        self.client.post("/api/tickets/check-in/", {"ticket_number": self.ticket.ticket_number})
+        self.assertEqual(Attendance.objects.count(), 1)
+        self.assertEqual(Notification.objects.filter(user=self.guest).count(), 1)
+
+    def test_offline_scan_keeps_its_scan_time_in_the_entry_log(self):
+        scanned_at = "2026-01-01T10:15:00+00:00"
+        scan = {"ticket_number": self.ticket.ticket_number, "scanned_at": scanned_at}
+        self.sync([scan])
+        self.sync([scan])  # re-sent after a dropped connection
+
+        entry = Attendance.objects.get(ticket=self.ticket)
+        self.assertEqual(entry.entered_at.isoformat(), scanned_at)
+        self.assertEqual(Notification.objects.filter(user=self.guest).count(), 1)
+
+    def test_entry_log_is_private_to_the_event_organizer(self):
+        client = APIClient()
+        client.force_authenticate(self.other_org)
+        res = client.get(f"/api/organizer/events/{self.event.id}/attendance/")
+        self.assertEqual(res.status_code, 403)
 
     def test_sync_applies_offline_scans_with_their_scan_time(self):
         scanned_at = "2026-01-01T10:15:00+00:00"

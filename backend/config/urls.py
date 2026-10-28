@@ -41,6 +41,7 @@ urlpatterns = [
     path("api/",include("users.admin_urls")),
     path("api/",include("recommendations.urls")),
     path("api/", include("feedback.urls")),
+    path("api/", include("notifications.urls")),
 ]
 urlpatterns += static(
     settings.MEDIA_URL,

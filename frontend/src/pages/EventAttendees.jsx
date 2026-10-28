@@ -15,6 +15,7 @@ function EventAttendees() {
     const [stats, setStats] = useState(null);
     const [attendees, setAttendees] = useState([]);
     const [turnout, setTurnout] = useState(null);
+    const [entries, setEntries] = useState([]);   // entry log: who came in and when
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -29,6 +30,10 @@ function EventAttendees() {
             })
             .catch(() => setError("Failed to load attendees."))
             .finally(() => setLoading(false));
+
+        api.get(`organizer/events/${id}/attendance/`)
+            .then((r) => setEntries(r.data))
+            .catch(() => setEntries([]));
 
         // The forecast is a nice-to-have; don't fail the page if it errors.
         api.get(`organizer/events/${id}/turnout/`)
@@ -142,6 +147,41 @@ function EventAttendees() {
                 </div>
             )}
 
+            <h3 className="section-title" style={{ margin: "8px 0 12px" }}>
+                Entry log <span className="section-count">{entries.length}</span>
+            </h3>
+            {entries.length === 0 ? (
+                <div className="empty-state" style={{ marginBottom: 28, padding: 24 }}>
+                    <div className="empty-state-title">Nobody has checked in yet</div>
+                </div>
+            ) : (
+                <div className="table-wrap" style={{ marginBottom: 28 }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Entry time</th>
+                                <th>Ticket</th>
+                                <th>Scanned by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {entries.map((e, i) => (
+                                <tr key={e.ticket_number}>
+                                    <td>{i + 1}</td>
+                                    <td style={{ fontWeight: 600 }}>{e.attendee_name}</td>
+                                    <td>{new Date(e.entered_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</td>
+                                    <td style={{ fontFamily: "monospace", fontSize: "12px" }}>{e.ticket_number}</td>
+                                    <td style={{ color: "var(--text-2)" }}>{e.scanned_by || "—"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            <h3 className="section-title" style={{ margin: "8px 0 12px" }}>All bookings</h3>
             {attendees.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">👥</div>
