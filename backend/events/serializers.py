@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .status import held_seats
 from .models import Event
 from bookings.models import Booking
 
@@ -30,10 +31,7 @@ class EventSerializer(serializers.ModelSerializer):
         read_only_fields = ["organizer", "created_at", "updated_at"]
 
     def get_available_seats(self, obj):
-        confirmed = Booking.objects.filter(
-            event=obj, status=Booking.Status.CONFIRMED
-        ).count()
-        return max(obj.capacity - confirmed, 0)
+        return max(obj.capacity - held_seats(obj), 0)
 
 
     def get_pricing(self, obj):

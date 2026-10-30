@@ -50,12 +50,53 @@ class User(AbstractUser):
         help_text="Organizers start False until admin approves.",
     )
 
+    class OrganizerStatus(models.TextChoices):
+        PENDING   = "PENDING",   "Pending"
+        APPROVED  = "APPROVED",  "Approved"
+        REJECTED  = "REJECTED",  "Rejected"
+        SUSPENDED = "SUSPENDED", "Suspended"
+
+    # Only meaningful for organizers. Defaults to APPROVED (like is_approved=True) so
+    # customers, admins and admin-created organizers are unaffected; public organizer
+    # registration always sets PENDING. Change it only through set_organizer_status().
+    organizer_status = models.CharField(
+        max_length=20,
+        choices=OrganizerStatus.choices,
+        default=OrganizerStatus.APPROVED,
+    )
+    status_reason = models.CharField(max_length=255, blank=True)
+
+    # ── Organizer application ─────────────────────────
+    organization_name = models.CharField(max_length=150, blank=True)
+    organizer_about   = models.TextField(blank=True)
+
     # ── Profile extras ────────────────────────────────
     phone   = models.CharField(max_length=20, blank=True)
     bio     = models.TextField(blank=True)
     avatar  = models.ImageField(upload_to="avatars/", blank=True, null=True)
     dob     = models.DateField(null=True, blank=True)
     address = models.CharField(max_length=255, blank=True)
+
+    def set_organizer_status(self, status, reason=""):
+        """The one place organizer status changes; keeps is_approved in sync."""
+        self.organizer_status = status
+        self.status_reason = reason or ""
+        self.is_approved = status == self.OrganizerStatus.APPROVED
+        self.save(update_fields=["organizer_status", "status_reason", "is_approved"])
+
+    def organizer_block(self):
+        """
+        Why this organizer can't use organizer features right now, as (code, message),
+        or None if they can. Used by login and by the IsOrganizerOrAdmin permission.
+        """
+        if self.role != self.Role.ORGANIZER or self.organizer_status == self.OrganizerStatus.APPROVED:
+            return None
+        reason = f" Reason: {self.status_reason}" if self.status_reason else ""
+        if self.organizer_status == self.OrganizerStatus.PENDING:
+            return "organizer_pending", "Your organizer account is awaiting admin approval."
+        if self.organizer_status == self.OrganizerStatus.REJECTED:
+            return "organizer_rejected", "Your organizer application was rejected." + reason
+        return "organizer_suspended", "Your organizer account has been suspended." + reason
 
     def __str__(self):
         return f"{self.email} ({self.role})"

@@ -1,0 +1,12 @@
+{
+  "name": "EventHub",
+  "short_name": "EventHub",
+  "description": "Book events in Nepal and keep your QR tickets on your phone.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1233",
+  "theme_color": "#1b2150",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

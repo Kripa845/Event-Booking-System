@@ -28,7 +28,12 @@ MESSAGES = {
 
 
 def can_manage(user, event):
-    return user.role == "ADMIN" or event.organizer_id == user.id
+    """Admins, the event's organizer, or door staff assigned to this event."""
+    return (
+        user.role == "ADMIN"
+        or event.organizer_id == user.id
+        or event.staff.filter(user=user).exists()
+    )
 
 
 def check_in_ticket(ticket_number, user, scanned_at=None, event_id=None):

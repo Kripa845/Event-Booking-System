@@ -31,6 +31,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
         read_only_fields = [
             "user",
+            "event",
             "status",
             "booked_at",
             "cancelled_at",

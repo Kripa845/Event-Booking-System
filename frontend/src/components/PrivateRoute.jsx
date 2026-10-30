@@ -5,9 +5,10 @@ import { useAuth } from "../context/AuthContext";
  * Wraps a route that requires authentication.
  * - requireOrganizer={true}: restricts to organizers/admins.
  * - requireAdmin={true}: restricts to admins only.
+ * - requireCheckIn={true}: organizers, admins, or customers added as door staff.
  */
-function PrivateRoute({ children, requireOrganizer = false, requireAdmin = false }) {
-    const { isAuthenticated, isOrganizer, isAdmin, profileLoading } = useAuth();
+function PrivateRoute({ children, requireOrganizer = false, requireAdmin = false, requireCheckIn = false }) {
+    const { isAuthenticated, isOrganizer, isAdmin, isDoorStaff, profileLoading } = useAuth();
     const location = useLocation();
 
     if (profileLoading) {
@@ -23,6 +24,10 @@ function PrivateRoute({ children, requireOrganizer = false, requireAdmin = false
     }
 
     if (requireAdmin && !isAdmin) {
+        return <Navigate to="/" replace />;
+    }
+
+    if (requireCheckIn && !(isOrganizer || isAdmin || isDoorStaff)) {
         return <Navigate to="/" replace />;
     }
 

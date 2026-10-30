@@ -1,12 +1,14 @@
+import os
 from pathlib import Path
 from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-^lk!zm*1$mibqrrb#!6f*kff&xjmh*ah7zjeb*bo1e=o+3^v#@'
+# Read from environment variables in production; the fallbacks keep local development working.
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", 'django-insecure-^lk!zm*1$mibqrrb#!6f*kff&xjmh*ah7zjeb*bo1e=o+3^v#@')
 
-DEBUG = True
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
+ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -27,11 +29,13 @@ INSTALLED_APPS = [
     'recommendations',
     'feedback',
     'notifications',
+    'payments',
 ]
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",   # serves admin CSS/JS in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -67,6 +71,21 @@ DATABASES = {
     }
 }
 
+# In production, DATABASE_URL (e.g. postgres://user:pass@host:5432/name) switches to PostgreSQL.
+if os.environ.get("DATABASE_URL"):
+    from urllib.parse import unquote, urlparse
+
+    _db = urlparse(os.environ["DATABASE_URL"])
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": _db.path.lstrip("/"),
+        "USER": unquote(_db.username or ""),
+        "PASSWORD": unquote(_db.password or ""),
+        "HOST": _db.hostname,
+        "PORT": _db.port or 5432,
+        "CONN_MAX_AGE": 60,
+    }
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -95,7 +114,20 @@ SIMPLE_JWT = {
 }
 
 # ── CORS ──────────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = True
+# Locally any origin is allowed. In production set CORS_ALLOWED_ORIGINS to the frontend URL(s),
+# comma-separated, e.g. https://eventhub.vercel.app
+CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+CORS_ALLOW_ALL_ORIGINS = not CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+
+if not DEBUG:
+    # Behind Render's HTTPS proxy: trust its header and only send cookies over HTTPS.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    # HSTS is left off on purpose: Render already forces HTTPS, and a wrong HSTS value
+    # can lock browsers out of the site for months.
 
 # ── i18n ─────────────────────────────────────────────
 LANGUAGE_CODE = 'en-us'
@@ -105,10 +137,18 @@ USE_TZ = True
 
 # ── Static / Media ────────────────────────────────────
 STATIC_URL  = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'   # filled by collectstatic when deploying
 MEDIA_URL   = '/media/'
 MEDIA_ROOT  = BASE_DIR / 'media'
 
 # ── Email (console for dev) ───────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# ── eSewa (defaults are eSewa's public TEST merchant; set real values via env vars) ──
+ESEWA_PRODUCT_CODE = os.environ.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
+ESEWA_SECRET_KEY = os.environ.get("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
+ESEWA_FORM_URL = os.environ.get("ESEWA_FORM_URL", "https://rc-epay.esewa.com.np/api/epay/main/v2/form")
+# Where eSewa sends the user back to after paying.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -19,7 +19,9 @@ export default function Register() {
     const navigate  = useNavigate();
     const [form, setForm] = useState({
         email: "", username: "", password: "", password2: "", role: "CUSTOMER",
+        organization_name: "", phone: "", organizer_about: "",
     });
+    const isOrganizer = form.role === "ORGANIZER";
     const [error,    setError]    = useState("");
     const [loading,  setLoading]  = useState(false);
     const [showPass, setShowPass] = useState(false);
@@ -75,12 +77,36 @@ export default function Register() {
                                     </button>
                                 ))}
                             </div>
-                            {form.role === "ORGANIZER" && (
+                            {isOrganizer && (
                                 <div className="pending-notice">
                                     ⏳ Organizer accounts need admin approval before you can log in.
                                 </div>
                             )}
                         </div>
+
+                        {isOrganizer && (
+                            <fieldset className="form-fieldset">
+                                <legend className="form-label">Your organizer application</legend>
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="organization_name">Organization / organizer name</label>
+                                    <input id="organization_name" name="organization_name" className="form-input"
+                                        placeholder="e.g. Kathmandu Tech Club" maxLength={150}
+                                        value={form.organization_name} onChange={onChange} required />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="phone">Phone</label>
+                                    <input id="phone" name="phone" type="tel" className="form-input"
+                                        placeholder="98XXXXXXXX" autoComplete="tel" maxLength={20}
+                                        value={form.phone} onChange={onChange} required />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="organizer_about">About your events</label>
+                                    <textarea id="organizer_about" name="organizer_about" className="form-textarea" rows={3}
+                                        placeholder="What kind of events will you run, and why do you want to organize on EventHub?"
+                                        value={form.organizer_about} onChange={onChange} required />
+                                </div>
+                            </fieldset>
+                        )}
 
                         <div className="form-group">
                             <label className="form-label" htmlFor="email">Email address</label>

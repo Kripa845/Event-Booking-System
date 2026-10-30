@@ -1,3 +1,4 @@
+import os
 import datetime
 import json
 import tempfile
@@ -179,7 +180,11 @@ class EarlyBirdPricingTests(TestCase):
         client.force_authenticate(u)
         res = client.post("/api/bookings/", {"event": self.event.id})
         self.assertEqual(res.status_code, 201)
-        return Booking.objects.get(id=res.data["id"])
+        # Paid events wait for eSewa; mark it paid like a verified payment would.
+        booking = Booking.objects.get(id=res.data["id"])
+        booking.status = Booking.Status.CONFIRMED
+        booking.save()
+        return booking
 
     def test_price_steps_up_after_early_bird_seats(self):
         pricing = APIClient().get(f"/api/events/{self.event.id}/").data["pricing"]
@@ -346,3 +351,130 @@ class SmartSearchTests(TestCase):
     def test_input_validation(self):
         self.assertEqual(self.search("").status_code, 400)
         self.assertEqual(self.search("x" * 300).status_code, 400)
+
+
+class EventVisibilityTests(TestCase):
+
+    def setUp(self):
+        self.org = User.objects.create_user(email="o1@test.com", password="pw", role="ORGANIZER")
+        self.other_org = User.objects.create_user(email="o2@test.com", password="pw", role="ORGANIZER")
+        self.published = make_event(self.org, 5)
+        self.published.status = Event.Status.PUBLISHED
+        self.published.save()
+        self.my_draft = make_event(self.org, 5)
+        self.my_draft.status = Event.Status.DRAFT
+        self.my_draft.save()
+        self.their_draft = make_event(self.other_org, 5)
+        self.their_draft.status = Event.Status.DRAFT
+        self.their_draft.save()
+
+    def ids(self, user=None):
+        client = APIClient()
+        if user:
+            client.force_authenticate(user)
+        data = client.get("/api/events/").data
+        return {e["id"] for e in data.get("results", data)}
+
+    def test_public_sees_only_published(self):
+        self.assertEqual(self.ids(), {self.published.id})
+
+    def test_organizer_sees_own_drafts_but_not_others(self):
+        self.assertEqual(self.ids(self.org), {self.published.id, self.my_draft.id})
+        self.assertEqual(self.ids(self.other_org), {self.published.id, self.their_draft.id})
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class AutomationTests(TestCase):
+    """Automatic status, notifications, duplicate, announce and daily tasks."""
+
+    def setUp(self):
+        from notifications.models import Notification
+        self.Notification = Notification
+        self.org = User.objects.create_user(email="o@test.com", password="pw", role="ORGANIZER")
+        self.other_org = User.objects.create_user(email="o2@test.com", password="pw", role="ORGANIZER")
+        self.alice = User.objects.create_user(email="a@test.com", password="pw")
+        self.bob = User.objects.create_user(email="b@test.com", password="pw")
+        self.event = make_event(self.org, 5, capacity=1)
+
+    def client_for(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    def titles(self, user):
+        return list(self.Notification.objects.filter(user=user).values_list("title", flat=True))
+
+    def test_sold_out_follows_seats_and_stays_visible(self):
+        alice = self.client_for(self.alice)
+        booking_id = alice.post("/api/bookings/", {"event": self.event.id}).data["id"]
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, Event.Status.SOLD_OUT)
+
+        listed = APIClient().get("/api/events/").data
+        self.assertIn(self.event.id, [e["id"] for e in listed.get("results", listed)])
+        res = self.client_for(self.bob).post("/api/bookings/", {"event": self.event.id})
+        self.assertEqual(res.data["error"], "Event is sold out.")
+
+        alice.post(f"/api/bookings/{booking_id}/cancel/")
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, Event.Status.PUBLISHED)
+
+    def test_waitlist_promotion_notifies_and_stays_sold_out(self):
+        alice = self.client_for(self.alice)
+        booking_id = alice.post("/api/bookings/", {"event": self.event.id}).data["id"]
+        self.client_for(self.bob).post("/api/waitlist/", {"event": self.event.id})
+        alice.post(f"/api/bookings/{booking_id}/cancel/")
+
+        self.assertIn("You got a seat! 🎟️", self.titles(self.bob))
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, Event.Status.SOLD_OUT)
+
+    def test_transfer_notifies_recipient(self):
+        self.event.capacity = 5
+        self.event.save()
+        alice = self.client_for(self.alice)
+        alice.post("/api/bookings/", {"event": self.event.id})
+        ticket = Ticket.objects.get(booking__user=self.alice)
+        res = alice.post(f"/api/tickets/{ticket.id}/transfer/", {"email": self.bob.email})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("You received a ticket 🎁", self.titles(self.bob))
+
+    def test_cancelling_event_notifies_ticket_holders_once(self):
+        Booking.objects.create(user=self.alice, event=self.event)
+        org = self.client_for(self.org)
+        org.patch(f"/api/events/{self.event.id}/", {"status": "CANCELLED"}, format="json")
+        org.patch(f"/api/events/{self.event.id}/", {"status": "CANCELLED"}, format="json")
+        self.assertEqual(self.titles(self.alice), ["Event cancelled 😔"])
+
+    def test_duplicate_creates_a_draft_copy_for_the_owner_only(self):
+        res = self.client_for(self.org).post(f"/api/events/{self.event.id}/duplicate/")
+        self.assertEqual(res.status_code, 201)
+        copy = Event.objects.get(id=res.data["id"])
+        self.assertEqual(copy.status, Event.Status.DRAFT)
+        self.assertEqual(copy.organizer, self.org)
+        self.assertTrue(copy.title.endswith("(copy)"))
+
+        res = self.client_for(self.other_org).post(f"/api/events/{self.event.id}/duplicate/")
+        self.assertEqual(res.status_code, 403)
+
+    def test_announcement_reaches_ticket_holders(self):
+        Booking.objects.create(user=self.alice, event=self.event)
+        url = f"/api/organizer/events/{self.event.id}/announce/"
+        res = self.client_for(self.org).post(url, {"message": "Doors open at 9."})
+        self.assertEqual(res.data["sent"], 1)
+        self.assertEqual(self.Notification.objects.get(user=self.alice).message, "Doors open at 9.")
+        self.assertEqual(self.client_for(self.other_org).post(url, {"message": "x"}).status_code, 403)
+        self.assertEqual(self.client_for(self.org).post(url, {"message": " "}).status_code, 400)
+
+    def test_daily_tasks_completes_past_events_and_reminds_once(self):
+        from django.core.management import call_command
+        past = make_event(self.org, -2)
+        tomorrow = make_event(self.org, 1)
+        Booking.objects.create(user=self.alice, event=tomorrow)
+
+        call_command("daily_tasks", stdout=open(os.devnull, "w"))
+        call_command("daily_tasks", stdout=open(os.devnull, "w"))
+
+        past.refresh_from_db()
+        self.assertEqual(past.status, Event.Status.COMPLETED)
+        self.assertEqual(self.titles(self.alice), ["See you tomorrow! ⏰"])

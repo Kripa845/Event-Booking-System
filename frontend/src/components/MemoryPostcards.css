@@ -56,3 +56,13 @@
 @media (prefers-reduced-motion: reduce) {
   .pc-card { transform: none; transition: none; }
 }
+
+.pc-comment { display: flex; gap: 6px; margin-top: 10px; }
+.pc-comment input {
+  flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid rgba(0,0,0,.15); border-radius: 6px;
+  background: rgba(255,255,255,.7); font-size: 12.5px;
+}
+.pc-comment button {
+  padding: 6px 10px; border: none; border-radius: 6px; background: #1b2150; color: #fff;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}

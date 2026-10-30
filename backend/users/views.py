@@ -2,6 +2,7 @@ from rest_framework import generics
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -13,10 +14,17 @@ from .serializers import (
 )
 
 
+class RegisterThrottle(AnonRateThrottle):
+    """Limit sign-ups per IP to slow down spam accounts."""
+    scope = "register"
+    rate  = "10/hour"
+
+
 class RegisterView(generics.CreateAPIView):
     queryset           = User.objects.all()
     serializer_class   = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes   = [RegisterThrottle]
 
 
 class ProfileView(APIView):

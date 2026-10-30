@@ -3,11 +3,12 @@ anthropic==1.15.0
 anyio==4.15.1
 asgiref==3.12.1
 colorama==0.4.6
-Django==6.0.8
 django-cors-headers==4.9.0
+Django==6.0.8
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 docstring_parser==0.18.0
+gunicorn==23.0.0
 h11==0.16.0
 httpcore2==2.13.1
 httpx2==2.13.1
@@ -35,3 +36,4 @@ truststore==0.10.5
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.3
+whitenoise==6.9.0

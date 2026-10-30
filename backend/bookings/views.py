@@ -1,20 +1,31 @@
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.utils import timezone
 
 from rest_framework.decorators import action
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from waitlist.services import promote_next_user
-from events.models import Event
-from events.pricing import current_price
+from events.status import refresh_sold_out
 
+from events.status import PENDING_MINUTES
+from payments.esewa import payment_form
+
+from .booking import BookingError, book
 from .models import Booking
 from .serializers import BookingSerializer
 
 
-class BookingViewSet(viewsets.ModelViewSet):
+# Only list, retrieve, create and the cancel action are exposed. Update and delete
+# are left out on purpose: they would skip the capacity/status checks and the
+# waitlist promotion that create() and cancel() enforce (PUT/PATCH/DELETE -> 405).
+class BookingViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
 
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
@@ -25,72 +36,25 @@ class BookingViewSet(viewsets.ModelViewSet):
         ).order_by("-booked_at")
 
     def create(self, request, *args, **kwargs):
-
-        event_id = request.data.get("event")
-
-        if not event_id:
-            return Response(
-                {"error": "Event is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        """Book {event} for yourself, optionally with {friends: [emails]} and {promo_code}."""
         try:
-            with transaction.atomic():
-
-                event = Event.objects.select_for_update().filter(
-                    id=event_id
-                ).first()
-
-                if not event:
-                    return Response(
-                        {"error": "Event not found."},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-                if event.status != Event.Status.PUBLISHED:
-                    return Response(
-                        {"error": "This event is not open for booking."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                existing_booking = Booking.objects.filter(
-                    user=request.user,
-                    event=event,
-                    status=Booking.Status.CONFIRMED,
-                ).exists()
-
-                if existing_booking:
-                    return Response(
-                        {"error": "You already have a confirmed booking for this event."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                confirmed_bookings = Booking.objects.filter(
-                    event=event,
-                    status=Booking.Status.CONFIRMED,
-                ).count()
-
-                if confirmed_bookings >= event.capacity:
-                    return Response(
-                        {"error": "Event is sold out."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                booking = Booking.objects.create(
-                    user=request.user,
-                    event=event,
-                    status=Booking.Status.CONFIRMED,
-                    price_paid=current_price(event, confirmed_bookings)["price"],
-                )
-
-        except IntegrityError:
-            return Response(
-                {"error": "You already booked this event."},
-                status=status.HTTP_400_BAD_REQUEST,
+            booking, friend_bookings, payment = book(
+                request.user,
+                request.data.get("event"),
+                friends=request.data.get("friends"),
+                promo_code=request.data.get("promo_code", ""),
             )
+        except BookingError as exc:
+            return Response({"error": str(exc)}, status=exc.status)
 
-        serializer = self.get_serializer(booking)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        data = self.get_serializer(booking).data
+        data["friends"] = [b.user.username for b in friend_bookings]
+        if payment:
+            # The browser posts these fields to eSewa; seats are held while the user pays.
+            data["payment"] = payment_form(payment)
+            data["amount"] = payment.amount
+            data["pay_within_minutes"] = PENDING_MINUTES
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
@@ -108,6 +72,12 @@ class BookingViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            if booking.status == Booking.Status.PENDING:
+                return Response(
+                    {"error": "This booking hasn't been paid yet."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             if booking.status == Booking.Status.CANCELLED:
                 return Response(
                     {"error": "Booking is already cancelled."},
@@ -123,6 +93,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 booking.ticket.save(update_fields=["status"])
 
             promote_next_user(booking.event)
+            refresh_sold_out(booking.event)   # back to PUBLISHED if nobody took the seat
 
         return Response(
             {"message": "Booking cancelled successfully."},

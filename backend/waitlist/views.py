@@ -1,20 +1,25 @@
-from django.shortcuts import render
-
-# Create your views here.
 from django.db import transaction
 
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from bookings.models import Booking
 from events.models import Event
+from events.status import held_seats
 
 from .models import WaitlistEntry
 from .serializers import WaitlistSerializer
 
 
-class WaitlistViewSet(viewsets.ModelViewSet):
+# Only list, retrieve and create (join) are exposed. Update and delete are left out
+# on purpose so entries can't be moved to another event or reordered (PUT/PATCH/DELETE -> 405).
+class WaitlistViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
 
     serializer_class = WaitlistSerializer
 
@@ -29,6 +34,12 @@ class WaitlistViewSet(viewsets.ModelViewSet):
         ).order_by("position")
 
     def create(self, request, *args, **kwargs):
+
+        if request.user.role == "ORGANIZER":
+            return Response(
+                {"error": "Organizer accounts can't join waitlists."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         event_id = request.data.get("event")
 
@@ -50,12 +61,7 @@ class WaitlistViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            confirmed_count = Booking.objects.filter(
-                event=event,
-                status=Booking.Status.CONFIRMED
-            ).count()
-
-            if confirmed_count < event.capacity:
+            if held_seats(event) < event.capacity:
 
                 return Response(
                     {

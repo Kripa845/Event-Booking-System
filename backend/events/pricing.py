@@ -14,7 +14,9 @@ REGULAR = "REGULAR"
 
 
 def confirmed_count(event):
-    return Booking.objects.filter(event=event, status=Booking.Status.CONFIRMED).count()
+    """Seats already taken: paid, or held while someone is paying (they count toward early-bird seats)."""
+    from .status import held_seats   # imported here to avoid a circular import
+    return held_seats(event)
 
 
 def current_price(event, confirmed=None):

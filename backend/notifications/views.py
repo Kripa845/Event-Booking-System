@@ -4,7 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Notification
+from users.models import User
+
+from .models import Follow, Notification
 
 LATEST = 20
 
@@ -37,3 +39,42 @@ class NotificationReadView(APIView):
     def post(self, request):
         Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
         return Response({"message": "All notifications marked as read."})
+
+
+class FollowView(APIView):
+    """
+    /api/organizers/<id>/follow/
+    GET: am I following, and how many followers.  POST: follow.  DELETE: unfollow.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _organizer(self, organizer_id):
+        return User.objects.filter(id=organizer_id, role=User.Role.ORGANIZER).first()
+
+    def _state(self, request, organizer):
+        return Response({
+            "following": Follow.objects.filter(follower=request.user, organizer=organizer).exists(),
+            "followers": Follow.objects.filter(organizer=organizer).count(),
+        })
+
+    def get(self, request, organizer_id):
+        organizer = self._organizer(organizer_id)
+        if not organizer:
+            return Response({"error": "Organizer not found."}, status=404)
+        return self._state(request, organizer)
+
+    def post(self, request, organizer_id):
+        organizer = self._organizer(organizer_id)
+        if not organizer:
+            return Response({"error": "Organizer not found."}, status=404)
+        if organizer == request.user:
+            return Response({"error": "You can't follow yourself."}, status=400)
+        Follow.objects.get_or_create(follower=request.user, organizer=organizer)
+        return self._state(request, organizer)
+
+    def delete(self, request, organizer_id):
+        organizer = self._organizer(organizer_id)
+        if not organizer:
+            return Response({"error": "Organizer not found."}, status=404)
+        Follow.objects.filter(follower=request.user, organizer=organizer).delete()
+        return self._state(request, organizer)

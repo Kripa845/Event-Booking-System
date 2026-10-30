@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 
 from users.models import User
+from users.organizers import OrganizerError, change_status, create_organizer
 from events.models import Event
 from bookings.models import Booking
 from events.pricing import revenue as paid_revenue
@@ -39,8 +40,9 @@ class AdminDashboardStatsView(APIView):
             "users": {
                 "total":      User.objects.count(),
                 "customers":  User.objects.filter(role=User.Role.CUSTOMER).count(),
-                "organizers": User.objects.filter(role=User.Role.ORGANIZER, is_approved=True).count(),
-                "pending":    User.objects.filter(role=User.Role.ORGANIZER, is_approved=False).count(),
+                "organizers": User.objects.filter(role=User.Role.ORGANIZER, organizer_status=User.OrganizerStatus.APPROVED).count(),
+                "pending":    User.objects.filter(role=User.Role.ORGANIZER, organizer_status=User.OrganizerStatus.PENDING).count(),
+                "suspended":  User.objects.filter(role=User.Role.ORGANIZER, organizer_status=User.OrganizerStatus.SUSPENDED).count(),
                 "admins":     User.objects.filter(role=User.Role.ADMIN).count(),
             },
             "events": {
@@ -74,9 +76,10 @@ class AdminDashboardStatsView(APIView):
 #  ORGANIZER APPROVAL
 # ─────────────────────────────────────────────
 
-class AdminPendingOrganizersView(APIView):
-    """Organizers who registered but are not yet approved."""
+class AdminOrganizerListView(APIView):
+    """Organizers with one status: GET /api/admin/organizers/<pending|approved|rejected|suspended>/"""
     permission_classes = [IsAuthenticated]
+    status_filter = None   # set per URL in admin_urls.py
 
     def get(self, request):
         err = admin_only(request)
@@ -85,67 +88,51 @@ class AdminPendingOrganizersView(APIView):
 
         users = User.objects.filter(
             role=User.Role.ORGANIZER,
-            is_approved=False,
+            organizer_status=self.status_filter,
         ).order_by("date_joined")
 
         return Response([_organizer_dict(u) for u in users])
 
 
-class AdminApprovedOrganizersView(APIView):
-    """Organizers who have been approved."""
+class AdminOrganizerStatusView(APIView):
+    """PATCH /api/admin/organizers/<id>/<approve|reject|suspend>/  body: {"reason": "..."} (optional)"""
     permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        err = admin_only(request)
-        if err:
-            return err
-
-        users = User.objects.filter(
-            role=User.Role.ORGANIZER,
-            is_approved=True,
-        ).order_by("date_joined")
-
-        return Response([_organizer_dict(u) for u in users])
-
-
-class AdminApproveOrganizerView(APIView):
-    """PATCH /api/admin/organizers/<id>/approve/"""
-    permission_classes = [IsAuthenticated]
+    new_status = None   # set per URL in admin_urls.py
 
     def patch(self, request, user_id):
         err = admin_only(request)
         if err:
             return err
 
-        user = User.objects.filter(id=user_id, role=User.Role.ORGANIZER).first()
-        if not user:
-            return Response({"error": "Organizer not found."}, status=404)
+        try:
+            user = change_status(user_id, self.new_status, request.data.get("reason", ""))
+        except OrganizerError as exc:
+            return Response({"error": str(exc)}, status=400)
 
-        user.is_approved = True
-        user.save(update_fields=["is_approved"])
-        return Response({"message": f"{user.username} has been approved."})
+        verb = {"APPROVED": "approved", "REJECTED": "rejected", "SUSPENDED": "suspended"}[self.new_status]
+        return Response({"message": f"{user.username} has been {verb}.", "organizer": _organizer_dict(user)})
 
 
-class AdminDeclineOrganizerView(APIView):
-    """DELETE /api/admin/organizers/<id>/decline/  — removes the pending account."""
+class AdminCreateOrganizerView(APIView):
+    """POST /api/admin/organizers/create/  {email, username, password, organization_name}"""
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, user_id):
+    def post(self, request):
         err = admin_only(request)
         if err:
             return err
 
-        user = User.objects.filter(
-            id=user_id,
-            role=User.Role.ORGANIZER,
-            is_approved=False,
-        ).first()
-        if not user:
-            return Response({"error": "Pending organizer not found."}, status=404)
+        try:
+            user = create_organizer(
+                request.data.get("email"),
+                request.data.get("username"),
+                request.data.get("password"),
+                request.data.get("organization_name", ""),
+            )
+        except OrganizerError as exc:
+            return Response({"error": str(exc)}, status=400)
 
-        username = user.username
-        user.delete()
-        return Response({"message": f"Organizer '{username}' has been declined and removed."})
+        return Response(_organizer_dict(user), status=status.HTTP_201_CREATED)
 
 
 # ─────────────────────────────────────────────
@@ -239,6 +226,11 @@ def _organizer_dict(u):
         "username":     u.username,
         "email":        u.email,
         "is_approved":  u.is_approved,
+        "organizer_status":  u.organizer_status,
+        "status_reason":     u.status_reason,
+        "organization_name": u.organization_name,
+        "phone":             u.phone,
+        "organizer_about":   u.organizer_about,
         "date_joined":  u.date_joined,
         "events_count": events_count,
         "revenue":      float(revenue),

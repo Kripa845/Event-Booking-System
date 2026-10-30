@@ -104,6 +104,18 @@ function OrganizerDashboard() {
         }
     };
 
+    // Copy an event as a new draft, then show it in the Drafts tab.
+    const duplicateEvent = async (eventId) => {
+        try {
+            await api.post(`events/${eventId}/duplicate/`);
+            const r = await api.get("organizer/events/");
+            setEvents(r.data);
+            setTab("drafts");
+        } catch (err) {
+            setError(err.response?.data?.error || err.response?.data?.detail || "Couldn't duplicate the event.");
+        }
+    };
+
     const deleteEvent = async (eventId) => {
         if (!window.confirm("Delete this event permanently? This cannot be undone.")) return;
         try {
@@ -317,6 +329,9 @@ function OrganizerDashboard() {
                                                         Cancel
                                                     </button>
                                                 )}
+                                                <button className="btn btn-ghost btn-xs" onClick={() => duplicateEvent(e.id)} title="Copy as a new draft">
+                                                    Duplicate
+                                                </button>
                                                 <button className="btn btn-ghost btn-xs" style={{ color: "var(--danger)" }} onClick={() => deleteEvent(e.id)}>
                                                     Delete
                                                 </button>

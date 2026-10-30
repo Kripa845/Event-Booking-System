@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getImageUrl } from "../services/api";
 import { fmtBs, fmtTime } from "../utils/format";
+import { useLang } from "../context/LanguageContext";
 
 const CAT_EMOJI = {
     WORKSHOP: "🛠️", SEMINAR: "📚", HACKATHON: "🏆", CONCERT: "🎵",
@@ -23,6 +24,7 @@ export default function EventCard({ event }) {
     const emoji   = CAT_EMOJI[cat] || "🎪";
     const imgSrc  = getImageUrl(event.banner) || getImageUrl(event.image);
     const [imgError, setImgError] = useState(false);
+    const { lang, t } = useLang();
 
     return (
         <div className="event-card">
@@ -47,7 +49,7 @@ export default function EventCard({ event }) {
                         <span className="event-card-meta-icon">📅</span>
                         <span>
                             {fmtDate(event.date)}
-                            <span className="event-card-bs">{fmtBs(event.date)}</span>
+                            <span className="event-card-bs">{fmtBs(event.date, lang)}</span>
                         </span>
                     </div>
                     {event.holidays?.length > 0 && (
@@ -69,17 +71,17 @@ export default function EventCard({ event }) {
             <div className="event-card-footer">
                 <div className="event-card-price-block">
                     <div className={`event-card-price${isFree ? " free" : ""}`}>
-                        {isFree ? "Free" : `NPR ${Number(price).toLocaleString()}`}
+                        {isFree ? t("card.free") : `NPR ${Number(price).toLocaleString()}`}
                         {earlyBird && <s className="event-card-was">NPR {Number(event.price).toLocaleString()}</s>}
                     </div>
                     {earlyBird && !soldOut && (
-                        <div className="event-card-early">Early bird · {event.pricing.left_at_price} left</div>
+                        <div className="event-card-early">{t("card.early")} · {event.pricing.left_at_price} {t("card.left")}</div>
                     )}
                     <div className={`event-card-seats${soldOut ? " sold-out" : ""}`}>
-                        {soldOut ? "Sold Out" : `${event.available_seats} seats left`}
+                        {soldOut ? t("card.soldOut") : `${event.available_seats} ${t("card.seatsLeft")}`}
                     </div>
                 </div>
-                <Link to={`/events/${event.id}`} className="btn btn-primary btn-sm">View →</Link>
+                <Link to={`/events/${event.id}`} className="btn btn-primary btn-sm">{t("card.view")}</Link>
             </div>
         </div>
     );

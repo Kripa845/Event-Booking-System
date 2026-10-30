@@ -3,6 +3,7 @@ from django.db import transaction
 from .models import WaitlistEntry
 from bookings.models import Booking
 from events.pricing import current_price
+from notifications.services import notify
 
 
 @transaction.atomic
@@ -43,6 +44,12 @@ def promote_next_user(event):
         waitlist_entry.status = WaitlistEntry.Status.PROMOTED
         waitlist_entry.save(
             update_fields=["status"]
+        )
+
+        notify(
+            waitlist_entry.user,
+            "You got a seat! 🎟️",
+            f"A seat opened up for {event.title} and it's yours. Your ticket is in My Tickets.",
         )
 
         return booking

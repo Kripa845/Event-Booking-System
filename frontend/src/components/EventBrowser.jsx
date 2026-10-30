@@ -1,19 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../services/api";
 import EventCard from "./EventCard";
+import { useLang } from "../context/LanguageContext";
 import "../pages/Home.css";
 
-const CATEGORIES = [
-    { value: "",           label: "All Events" },
-    { value: "WORKSHOP",   label: "🛠️ Workshop" },
-    { value: "HACKATHON",  label: "🏆 Hackathon" },
-    { value: "CONCERT",    label: "🎵 Concert" },
-    { value: "CONFERENCE", label: "🎙️ Conference" },
-    { value: "SEMINAR",    label: "📚 Seminar" },
-    { value: "SPORTS",     label: "⚽ Sports" },
-    { value: "FESTIVAL",   label: "🎉 Festival" },
-    { value: "MEETUP",     label: "☕ Meetup" },
-];
+// Labels come from the language dictionary (cat.<VALUE>, cat.all).
+const CATEGORIES = ["", "WORKSHOP", "HACKATHON", "CONCERT", "CONFERENCE", "SEMINAR", "SPORTS", "FESTIVAL", "MEETUP"];
 
 /**
  * The "browse events" section (search, plain-English search, category chips, event grid).
@@ -21,6 +13,8 @@ const CATEGORIES = [
  * onEventsChange lets the landing page hero show the same events.
  */
 export default function EventBrowser({ onEventsChange }) {
+    const { t } = useLang();
+    const catLabel = (value) => t(value ? `cat.${value}` : "cat.all");
     const [events,   setEvents]   = useState([]);
     const [search,   setSearch]   = useState("");
     const [category, setCategory] = useState("");
@@ -71,40 +65,38 @@ export default function EventBrowser({ onEventsChange }) {
     const heading = smartInfo?.summary
         ? smartInfo.summary
         : search
-        ? `Results for "${search}"`
+        ? `${t("browse.results")} "${search}"`
         : category
-        ? `${CATEGORIES.find(c => c.value === category)?.label ?? category} Events`
-        : "Upcoming Events";
+        ? `${catLabel(category)} ${t("browse.eventsSuffix")}`
+        : t("browse.upcoming");
 
     return (
         <section id="events" className="lk-events container">
-            <h2 className="lk-section-title">Find something worth staying up for</h2>
+            <h2 className="lk-section-title">{t("browse.title")}</h2>
             <div className="search-mode" role="group" aria-label="Search mode">
                 <button
                     type="button" aria-pressed={!smart}
                     className={!smart ? "active" : ""} onClick={() => setSmart(false)}
                 >
-                    Keywords
+                    {t("browse.keywords")}
                 </button>
                 <button
                     type="button" aria-pressed={smart}
                     className={smart ? "active" : ""} onClick={() => setSmart(true)}
                 >
-                    ✨ Plain English
+                    {t("browse.plain")}
                 </button>
             </div>
             <form className="search-bar" onSubmit={onSearch}>
                 <input
                     type="text"
                     aria-label={smart ? "Describe what you're looking for" : "Search events"}
-                    placeholder={smart
-                        ? "e.g. free tech workshops this weekend in Lalitpur"
-                        : "Search events, locations, organizers…"}
+                    placeholder={smart ? t("browse.placeholderSmart") : t("browse.placeholder")}
                     value={search}
                     maxLength={200}
                     onChange={(e) => setSearch(e.target.value)}
                 />
-                <button type="submit" className="search-btn">{smart ? "Ask" : "Search"}</button>
+                <button type="submit" className="search-btn">{smart ? t("browse.ask") : t("browse.search")}</button>
             </form>
             {smartInfo?.fallback && (
                 <p className="smart-note" role="status">{smartInfo.fallback} Showing keyword results instead.</p>
@@ -115,14 +107,14 @@ export default function EventBrowser({ onEventsChange }) {
                 </p>
             )}
             <div className="filter-chips">
-                {CATEGORIES.map((c) => (
+                {CATEGORIES.map((value) => (
                     <button
-                        key={c.value}
-                        className={`chip${category === c.value ? " active" : ""}`}
-                        onClick={() => onCat(c.value)}
+                        key={value}
+                        className={`chip${category === value ? " active" : ""}`}
+                        onClick={() => onCat(value)}
                         type="button"
                     >
-                        {c.label}
+                        {catLabel(value)}
                     </button>
                 ))}
             </div>
@@ -136,7 +128,7 @@ export default function EventBrowser({ onEventsChange }) {
                 </h3>
                 {(search || category || smartInfo) && (
                     <button className="btn btn-ghost btn-sm" onClick={onClear}>
-                        ✕ Clear filters
+                        {t("browse.clear")}
                     </button>
                 )}
             </div>
@@ -146,8 +138,8 @@ export default function EventBrowser({ onEventsChange }) {
             ) : events.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">🔍</div>
-                    <div className="empty-state-title">No events found</div>
-                    <div className="empty-state-text">Try a different search or category.</div>
+                    <div className="empty-state-title">{t("browse.none")}</div>
+                    <div className="empty-state-text">{t("browse.noneHint")}</div>
                 </div>
             ) : (
                 <div className="events-grid">

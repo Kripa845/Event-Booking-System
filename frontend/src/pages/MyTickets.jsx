@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import api, { getImageUrl } from "../services/api";
 import WeatherCard from "../components/WeatherCard";
+import { useLang } from "../context/LanguageContext";
+import { loadTicketList, saveTicket, saveTicketList } from "../utils/offlineTickets";
 
 function formatDate(d) {
     if (!d) return "";
@@ -19,6 +21,7 @@ function TicketStatusBadge({ status }) {
 }
 
 function MyTickets() {
+    const { t } = useLang();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [cancelling, setCancelling] = useState(null);
@@ -31,9 +34,19 @@ function MyTickets() {
     const fetchData = async () => {
         try {
             const res = await api.get("tickets/");
-            setTickets(res.data.results ?? res.data);
-        } catch {
-            setError("Failed to load tickets.");
+            const list = res.data.results ?? res.data;
+            setTickets(list);
+            // Save the list and every valid ticket (with its QR) for offline use at the door.
+            saveTicketList(list);
+            list.filter((t) => t.status === "VALID").forEach((t) => saveTicket(t, getImageUrl(t.qr_code)));
+        } catch (err) {
+            const saved = !err.response && loadTicketList();
+            if (saved) {
+                setTickets(saved);
+                setNotice("You're offline. Showing the tickets saved on this device.");
+            } else {
+                setError("Failed to load tickets.");
+            }
         } finally {
             setLoading(false);
         }
@@ -90,10 +103,10 @@ function MyTickets() {
             <BackButton />
             <div className="section-header">
                 <div>
-                    <h1 className="page-title">My Tickets</h1>
-                    <p className="page-subtitle">All your event bookings in one place.</p>
+                    <h1 className="page-title">{t("tickets.title")}</h1>
+                    <p className="page-subtitle">{t("tickets.subtitle")}</p>
                 </div>
-                <Link to="/" className="btn btn-outline">Browse Events</Link>
+                <Link to="/" className="btn btn-outline">{t("tickets.browse")}</Link>
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}

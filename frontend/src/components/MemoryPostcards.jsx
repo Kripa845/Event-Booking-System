@@ -39,6 +39,7 @@ function StarRating({ value, onRate, label }) {
 export default function MemoryPostcards() {
     const [cards, setCards] = useState(null);
     const [thanks, setThanks] = useState(null);   // event_id just rated
+    const [drafts, setDrafts] = useState({});     // event_id -> comment being typed
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -47,12 +48,14 @@ export default function MemoryPostcards() {
             .catch(() => setCards([]));
     }, []);
 
-    const rate = async (eventId, rating) => {
+    const rate = async (eventId, rating, comment) => {
         setError("");
         const before = cards;
-        setCards(cards.map((c) => (c.event_id === eventId ? { ...c, rating } : c)));
+        const current = cards.find((c) => c.event_id === eventId);
+        const text = comment ?? current?.comment ?? "";
+        setCards(cards.map((c) => (c.event_id === eventId ? { ...c, rating, comment: text } : c)));
         try {
-            await api.post(`postcards/${eventId}/rate/`, { rating });
+            await api.post(`postcards/${eventId}/rate/`, { rating, comment: text });
             setThanks(eventId);
         } catch (err) {
             setCards(before);
@@ -84,6 +87,20 @@ export default function MemoryPostcards() {
                                 <p className="pc-where">{c.location}</p>
                                 <div className="pc-ask">{c.rating ? "Your rating" : "How was it?"}</div>
                                 <StarRating value={c.rating} onRate={(n) => rate(c.event_id, n)} label={`Rate ${c.title}`} />
+                                {c.rating > 0 && (
+                                    <form
+                                        className="pc-comment"
+                                        onSubmit={(e) => { e.preventDefault(); rate(c.event_id, c.rating, drafts[c.event_id] ?? c.comment); }}
+                                    >
+                                        <input
+                                            aria-label={`Review of ${c.title}`} maxLength={500}
+                                            placeholder="Add a short review (optional)"
+                                            value={drafts[c.event_id] ?? c.comment ?? ""}
+                                            onChange={(e) => setDrafts({ ...drafts, [c.event_id]: e.target.value })}
+                                        />
+                                        <button type="submit">Save</button>
+                                    </form>
+                                )}
                                 {thanks === c.event_id && <div className="pc-thanks">Thanks! Noted.</div>}
                             </div>
                             <div className="pc-addr">

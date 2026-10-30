@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import TicketIcon from "../components/TicketIcon";
 import api, { getImageUrl } from "../services/api";
+import { downloadIcs } from "../utils/download";
+import { loadTicket, saveTicket } from "../utils/offlineTickets";
 import { fmtBs, fmtTime } from "../utils/format";
 import "./TicketView.css";
 
@@ -22,11 +24,26 @@ function TicketView() {
     const [ticket, setTicket] = useState(null);
     const [error, setError] = useState("");
     const [saving, setSaving] = useState(null);   // "png" | "pdf" | null
+    const [qrSrc, setQrSrc] = useState(null);     // saved QR image when showing the offline copy
+    const [offlineSince, setOfflineSince] = useState(null);
 
     useEffect(() => {
         api.get(`tickets/${id}/`)
-            .then((res) => setTicket(res.data))
-            .catch(() => setError("Ticket not found."));
+            .then((res) => {
+                setTicket(res.data);
+                // Keep a copy on this device so the ticket opens without internet.
+                if (res.data.status !== "CANCELLED") saveTicket(res.data, getImageUrl(res.data.qr_code));
+            })
+            .catch((err) => {
+                const saved = !err.response && loadTicket(id);
+                if (saved) {
+                    setTicket(saved.ticket);
+                    setQrSrc(saved.qrDataUrl);
+                    setOfflineSince(saved.savedAt);
+                } else {
+                    setError(err.response ? "Ticket not found." : "You're offline and this ticket isn't saved on this device yet.");
+                }
+            });
     }, [id]);
 
     // Draws the ticket (including the QR image) into a PNG.
@@ -103,6 +120,12 @@ function TicketView() {
         <div className="container page tv">
             <BackButton />
 
+            {offlineSince && (
+                <div className="alert alert-info" style={{ marginBottom: 16 }}>
+                    You're offline. This is the copy saved on this device on {new Date(offlineSince).toLocaleString()}. The QR code still works at the door.
+                </div>
+            )}
+
             <div className="tv-sheet" ref={sheetRef}>
                 <article className={`tv-ticket${cancelled ? " is-cancelled" : ""}`}>
                     <div className="tv-main">
@@ -151,7 +174,7 @@ function TicketView() {
                         ) : (
                             <>
                                 <div className="tv-qr">
-                                    <img src={getImageUrl(ticket.qr_code)} alt={`QR code for ${ticket.ticket_number}`} crossOrigin="anonymous" />
+                                    <img src={qrSrc || getImageUrl(ticket.qr_code)} alt={`QR code for ${ticket.ticket_number}`} crossOrigin="anonymous" />
                                 </div>
                                 <div className="tv-number">{ticket.ticket_number}</div>
                                 <div className="tv-hint">Show this code at the entrance</div>
@@ -174,6 +197,16 @@ function TicketView() {
                     </button>
                     <button className="btn btn-outline" onClick={savePdf} disabled={!!saving}>
                         {saving === "pdf" ? "Saving…" : "Save as PDF"}
+                    </button>
+                    <button
+                        className="btn btn-ghost"
+                        onClick={() => downloadIcs({
+                            id: ticket.event_id, title: ticket.event_title, date: ticket.event_date,
+                            start: ticket.event_start_time, end: ticket.event_end_time, location: place,
+                            description: `Ticket ${ticket.ticket_number}`,
+                        })}
+                    >
+                        📅 Add to calendar
                     </button>
                 </div>
             )}

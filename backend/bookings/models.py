@@ -5,6 +5,7 @@ from django.db import models
 class Booking(models.Model):
 
     class Status(models.TextChoices):
+        PENDING   = "PENDING",   "Waiting for payment"
         CONFIRMED = "CONFIRMED", "Confirmed"
         CANCELLED = "CANCELLED", "Cancelled"
 
@@ -36,6 +37,11 @@ class Booking(models.Model):
     )
 
     # What the attendee actually paid (prices can change, e.g. early-bird).
+    promo_code = models.CharField(max_length=30, blank=True)   # code used, if any
+    payment = models.ForeignKey(
+        "payments.Payment", on_delete=models.SET_NULL, null=True, blank=True, related_name="bookings",
+    )
+
     price_paid = models.DecimalField(
         max_digits=10,
         decimal_places=2,

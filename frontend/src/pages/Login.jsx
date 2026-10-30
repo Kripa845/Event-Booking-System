@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { takeAuthNotice } from "../services/api";
 import BackButton from "../components/BackButton";
 import AuthBrand from "../components/AuthBrand";
 
@@ -18,7 +19,7 @@ export default function Login() {
     const from      = location.state?.from?.pathname;
 
     const [form,     setForm]     = useState({ email: "", password: "" });
-    const [error,    setError]    = useState("");
+    const [error,    setError]    = useState(takeAuthNotice);   // e.g. "account suspended" after a forced logout
     const [loading,  setLoading]  = useState(false);
     const [showPass, setShowPass] = useState(false);
 

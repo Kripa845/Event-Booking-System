@@ -137,7 +137,7 @@ def _parse_date(value):
 def run_filters(filters, today=None):
     """Apply extracted filters to published events. Returns (events, relaxed_fields)."""
     today = today or timezone.localdate()
-    qs = Event.objects.filter(status=Event.Status.PUBLISHED).select_related("organizer")
+    qs = Event.objects.filter(status__in=[Event.Status.PUBLISHED, Event.Status.SOLD_OUT]).select_related("organizer")
 
     date_from = _parse_date(filters.get("date_from"))
     date_to = _parse_date(filters.get("date_to"))

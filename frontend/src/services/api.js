@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearSavedTickets } from "../utils/offlineTickets";
 
 // Where the Django backend runs. Override with VITE_API_URL in frontend/.env.local,
 // e.g. VITE_API_URL=http://127.0.0.1:8001 when port 8000 is taken by another app.
@@ -13,6 +14,31 @@ export function getImageUrl(path) {
 const api = axios.create({
     baseURL: `${BASE_URL}/api/`,
 });
+
+const NOTICE_KEY = "eh-auth-notice";
+
+/**
+ * Log out and go to the login page, which shows `message`.
+ * Used when the server says an organizer account is no longer approved.
+ */
+export function forceLogout(message) {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    clearSavedTickets();
+    try { sessionStorage.setItem(NOTICE_KEY, message); } catch { /* storage unavailable */ }
+    window.location.href = "/login";
+}
+
+/** Read (and clear) the message left by forceLogout, if any. */
+export function takeAuthNotice() {
+    try {
+        const message = sessionStorage.getItem(NOTICE_KEY);
+        sessionStorage.removeItem(NOTICE_KEY);
+        return message || "";
+    } catch {
+        return "";
+    }
+}
 
 let isRefreshing = false;
 let pendingRequests = [];
@@ -32,6 +58,13 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+
+        // Organizer pending, rejected or suspended: their token no longer works for organizer pages.
+        const code = error.response?.data?.code;
+        if (error.response?.status === 403 && typeof code === "string" && code.startsWith("organizer_")) {
+            forceLogout(error.response.data.error);
+            return Promise.reject(error);
+        }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
             if (isRefreshing) {

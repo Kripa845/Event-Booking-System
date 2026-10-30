@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MyTickets from "./pages/MyTickets";
 import TicketView from "./pages/TicketView";
+import PaymentResult from "./pages/PaymentResult";
 import MySky from "./pages/MySky";
 import Waitlist from "./pages/Waitlist";
 import CheckIn from "./pages/CheckIn";
@@ -68,6 +69,12 @@ function App() {
                 <Route path="/my-tickets" element={
                     <PrivateRoute><MyTickets /></PrivateRoute>
                 } />
+                <Route path="/payment/esewa/success" element={
+                    <PrivateRoute><PaymentResult outcome="success" /></PrivateRoute>
+                } />
+                <Route path="/payment/esewa/failure" element={
+                    <PrivateRoute><PaymentResult outcome="failure" /></PrivateRoute>
+                } />
                 <Route path="/my-tickets/:id" element={
                     <PrivateRoute><TicketView /></PrivateRoute>
                 } />
@@ -92,7 +99,7 @@ function App() {
                     <PrivateRoute requireOrganizer><EventAttendees /></PrivateRoute>
                 } />
                 <Route path="/check-in" element={
-                    <PrivateRoute requireOrganizer><CheckIn /></PrivateRoute>
+                    <PrivateRoute requireCheckIn><CheckIn /></PrivateRoute>
                 } />
 
                 {/* ── Admin (sidebar layout) ── */}

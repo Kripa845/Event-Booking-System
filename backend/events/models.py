@@ -109,3 +109,39 @@ class Holiday(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.start_date})"
+
+
+class PromoCode(models.Model):
+    """A discount code an organizer creates for one event, e.g. STUDENT20 = 20% off."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="promo_codes")
+    code = models.CharField(max_length=30)                 # stored upper-case
+    percent_off = models.PositiveSmallIntegerField()       # 1-100
+    max_uses = models.PositiveIntegerField(null=True, blank=True)   # empty = unlimited
+    uses = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["event", "code"], name="unique_promo_per_event"),
+        ]
+
+    def __str__(self):
+        return f"{self.code} ({self.percent_off}% off {self.event})"
+
+
+class EventStaff(models.Model):
+    """A helper the organizer allows to scan tickets at the door for one event."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="staff")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="door_events")
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["event", "user"], name="unique_staff_per_event"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} scans for {self.event}"

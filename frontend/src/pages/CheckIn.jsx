@@ -48,6 +48,23 @@ function CheckIn() {
 
     const refreshPack = useCallback(() => setPack(eventId ? loadPack(eventId) : null), [eventId]);
 
+    // Live "people inside" counter from the server, refreshed every 10 seconds while online.
+    const [live, setLive] = useState(null);   // { inside, total }
+    const loadLive = useCallback(() => {
+        if (!eventId) return;
+        api.get(`organizer/events/${eventId}/stats/`)
+            .then((r) => setLive({ inside: r.data.checked_in, total: r.data.tickets_sold }))
+            .catch(() => { /* keep the last known numbers */ });
+    }, [eventId]);
+
+    useEffect(() => {
+        setLive(null);
+        if (!online || !eventId) return;
+        loadLive();
+        const timer = setInterval(loadLive, 10000);
+        return () => clearInterval(timer);
+    }, [online, eventId, loadLive]);
+
     // Online/offline indicator
     useEffect(() => {
         const up = () => setOnline(true);
@@ -62,7 +79,7 @@ function CheckIn() {
 
     // Events this organizer can check in to (falls back to downloaded ones when offline)
     useEffect(() => {
-        api.get("organizer/events/")
+        api.get("checkin/events/")
             .then((res) => setEvents(res.data))
             .catch(() => setEvents(savedEvents()));
     }, []);
@@ -145,6 +162,7 @@ function CheckIn() {
             const res = await api.post("tickets/check-in/", { ticket_number: number, event_id: Number(eventId) });
             setResult({ success: true, data: res.data });
             markUsedLocally(eventId, number, res.data.checked_in_at);
+            loadLive();
             refreshPack();
             setTicketNumber("");
         } catch (err) {
@@ -183,6 +201,8 @@ function CheckIn() {
     const checkedIn = tickets.filter((t) => t.status === "USED").length;
     const active = tickets.filter((t) => t.status !== "CANCELLED").length;
     const pending = pack?.queue.length ?? 0;
+    // Offline (or before the first server reply) fall back to the downloaded list.
+    const counter = online && live ? live : pack ? { inside: checkedIn, total: active } : null;
     const selectedEvent = events.find((ev) => String(ev.id) === eventId) || pack?.event;
 
     return (
@@ -249,6 +269,18 @@ function CheckIn() {
                         <button type="button" className="btn btn-primary btn-sm" onClick={sync} disabled={!online || syncing}>
                             {syncing ? "Syncing…" : online ? "Sync now" : "Will sync when online"}
                         </button>
+                    </div>
+                )}
+
+                {counter && (
+                    <div className="checkin-counter" aria-live="polite">
+                        <span className="checkin-counter-num">{counter.inside}</span>
+                        <span className="checkin-counter-total">/ {counter.total} inside</span>
+                        {counter.total > 0 && (
+                            <div className="checkin-counter-bar">
+                                <i style={{ width: `${Math.min(100, (counter.inside / counter.total) * 100)}%` }} />
+                            </div>
+                        )}
                     </div>
                 )}
 

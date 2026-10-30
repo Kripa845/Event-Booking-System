@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.permissions import IsOrganizerOrAdmin
+from users.permissions import CanCheckIn
 
 from . import checkin
 from .models import Ticket
@@ -51,7 +51,7 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
         detail=False,
         methods=["post"],
         url_path="check-in",
-        permission_classes=[IsOrganizerOrAdmin],
+        permission_classes=[CanCheckIn],
     )
     def check_in(self, request):
 
@@ -104,7 +104,7 @@ class TicketViewSet(viewsets.ReadOnlyModelViewSet):
         detail=False,
         methods=["post"],
         url_path="check-in/sync",
-        permission_classes=[IsOrganizerOrAdmin],
+        permission_classes=[CanCheckIn],
     )
     def check_in_sync(self, request):
         """

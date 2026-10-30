@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from bookings.models import Booking
 from events.models import Event
+from notifications.services import notify
 from users.models import User
 
 from .models import Ticket
@@ -61,6 +62,12 @@ def transfer_ticket(ticket_id, sender, recipient_email):
 
     ticket.status = Ticket.Status.CANCELLED
     ticket.save(update_fields=["status"])
+
+    notify(
+        recipient,
+        "You received a ticket 🎁",
+        f"{sender.username} sent you their ticket for {event.title}. It's in My Tickets.",
+    )
 
     # A post_save signal issues the new ticket + QR code.
     return Booking.objects.create(

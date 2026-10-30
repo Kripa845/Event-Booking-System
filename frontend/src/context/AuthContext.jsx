@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import api from "../services/api";
+import api, { forceLogout } from "../services/api";
+import { clearSavedTickets } from "../utils/offlineTickets";
 
 const AuthContext = createContext();
 
@@ -13,6 +14,13 @@ export function AuthProvider({ children }) {
             const res = await api.get("auth/profile/", {
                 headers: { Authorization: `Bearer ${token}` },
             });
+            // An organizer who was suspended (or never approved) is signed out right away.
+            if (res.data.role === "ORGANIZER" && res.data.organizer_status && res.data.organizer_status !== "APPROVED") {
+                forceLogout(res.data.organizer_status === "SUSPENDED"
+                    ? "Your organizer account has been suspended."
+                    : "Your organizer account is not approved.");
+                return;
+            }
             setUser(res.data);
         } catch {
             setUser(null);
@@ -44,6 +52,7 @@ export function AuthProvider({ children }) {
     const logout = () => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        clearSavedTickets();
         setAccessToken(null);
         setUser(null);
     };
@@ -58,6 +67,7 @@ export function AuthProvider({ children }) {
             isOrganizer: user?.role === "ORGANIZER",
             isAdmin:     user?.role === "ADMIN",
             isCustomer:  user?.role === "CUSTOMER",
+            isDoorStaff: !!user?.is_door_staff,
         }}>
             {children}
         </AuthContext.Provider>
